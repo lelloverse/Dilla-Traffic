@@ -214,7 +214,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                           {v.stolen_status?.isStolen ? <FaShieldAlt size={16} /> : <FaExclamationTriangle size={16} />}
                         </button>
                         <button className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
-                          View
+                          Stolen
                         </button>
                       </div>
                     </td>
