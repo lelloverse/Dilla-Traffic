@@ -45,11 +45,13 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
       setVehicles(currentVehicles =>
         currentVehicles.map(v => {
           if (v.id === vehicle.id) {
+            const isNowStolen = !wasStolen;
             return {
               ...v,
-              stolen_status: wasStolen
-                ? { ...v.stolen_status!, isStolen: false }
-                : { isStolen: true, reportedBy: currentUser, reportedAt: new Date().toISOString() }
+              status: isNowStolen ? 'Stolen' : 'Active',
+              stolen_status: isNowStolen
+                ? { isStolen: true, reportedBy: currentUser, reportedAt: new Date().toISOString() }
+                : { ...v.stolen_status!, isStolen: false }
             };
           }
           return v;
@@ -78,14 +80,13 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
       model.includes(search);
     
     const matchesType = filterType === 'all' || v.type === filterType;
-    const matchesStatus = filterStatus === 'all' || 
-      (filterStatus === 'Stolen' ? v.stolen_status?.isStolen : v.status === filterStatus);
+    const matchesStatus = filterStatus === 'all' || v.status === filterStatus;
 
     return matchesSearch && matchesType && matchesStatus;
   });
 
   const getStatusColor = (v: Vehicle) => {
-    if (v.stolen_status?.isStolen) return 'bg-red-600 text-white border-red-700 animate-pulse';
+    if (v.status === 'Stolen') return 'bg-red-600 text-white border-red-700 animate-pulse';
     switch (v.status) {
       case 'Active': return 'bg-green-100 text-green-700 border-green-200';
       case 'Expired': return 'bg-red-100 text-red-700 border-red-200';
@@ -183,16 +184,16 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
             <tbody className="divide-y divide-gray-200">
               {filteredVehicles.length > 0 ? (
                 filteredVehicles.map((v) => (
-                  <tr key={v.id} className={`hover:bg-gray-50 transition-colors group ${v.stolen_status?.isStolen ? 'bg-red-50/30' : ''}`}>
+                  <tr key={v.id} className={`hover:bg-gray-50 transition-colors group ${v.status === 'Stolen' ? 'bg-red-50/30' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 transition-colors ${v.stolen_status?.isStolen ? 'bg-red-600 text-white animate-bounce' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
-                          {v.stolen_status?.isStolen ? <FaExclamationTriangle size={20} /> : <FaCar size={20} />}
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 transition-colors ${v.status === 'Stolen' ? 'bg-red-600 text-white animate-bounce' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                          {v.status === 'Stolen' ? <FaExclamationTriangle size={20} /> : <FaCar size={20} />}
                         </div>
                         <div>
-                          <p className={`font-bold ${v.stolen_status?.isStolen ? 'text-red-700' : 'text-gray-900'}`}>
+                          <p className={`font-bold ${v.status === 'Stolen' ? 'text-red-700' : 'text-gray-900'}`}>
                             {v.plateNumber}
-                            {v.stolen_status?.isStolen && <span className="ml-2 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full animate-pulse">STOLEN</span>}
+                            {v.status === 'Stolen' && <span className="ml-2 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full animate-pulse">STOLEN</span>}
                           </p>
                           <p className="text-xs text-gray-500">{v.year} {v.make} {v.model}</p>
                         </div>
@@ -213,7 +214,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(v)}`}>
-                        {v.stolen_status?.isStolen ? 'STOLEN' : v.status}
+                        {v.status}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -229,12 +230,20 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                             setSelectedVehicle(v);
                             setShowStolenModal(true);
                           }}
-                          title={v.stolen_status?.isStolen ? "Mark as Recovered" : "Flag as Stolen"}
-                          className={`p-2 rounded-lg transition-colors ${v.stolen_status?.isStolen ? 'bg-green-50 text-green-600 hover:bg-green-600 hover:text-white' : 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white'}`}
+                          title={v.status === 'Stolen' ? "Mark as Recovered" : "Flag as Stolen"}
+                          className={`p-2 rounded-lg transition-colors ${v.status === 'Stolen' ? 'bg-green-50 text-green-600 hover:bg-green-600 hover:text-white' : 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white'}`}
                         >
-                          {v.stolen_status?.isStolen ? <FaShieldAlt size={16} /> : <FaExclamationTriangle size={16} />}
+                          {v.status === 'Stolen' ? <FaShieldAlt size={16} /> : <FaExclamationTriangle size={16} />}
                         </button>
-                        <button className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
+                        <button 
+                          onClick={() => {
+                            if (v.status === 'Stolen') {
+                              setSelectedVehicle(v);
+                              setShowStolenModal(true);
+                            }
+                          }}
+                          className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                        >
                           Stolen
                         </button>
                       </div>
@@ -257,19 +266,19 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
       {showStolenModal && selectedVehicle && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
-            <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 ${selectedVehicle.stolen_status?.isStolen ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-              {selectedVehicle.stolen_status?.isStolen ? <FaShieldAlt size={32} /> : <FaExclamationTriangle size={32} />}
+            <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 ${selectedVehicle.status === 'Stolen' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+              {selectedVehicle.status === 'Stolen' ? <FaShieldAlt size={32} /> : <FaExclamationTriangle size={32} />}
             </div>
             <h3 className="text-xl font-bold text-center text-gray-900 mb-2">
-              {selectedVehicle.stolen_status?.isStolen ? 'Vehicle Recovered?' : 'Report Stolen Vehicle?'}
+              {selectedVehicle.status === 'Stolen' ? 'Vehicle Recovered?' : 'Report Stolen Vehicle?'}
             </h3>
             <p className="text-gray-500 text-center mb-6">
-              {selectedVehicle.stolen_status?.isStolen 
+              {selectedVehicle.status === 'Stolen' 
                 ? `Are you sure you want to unmark vehicle ${selectedVehicle.plateNumber} as stolen? This will restore its previous status.`
                 : `Are you sure you want to mark vehicle ${selectedVehicle.plateNumber} as STOLEN? This status will be visible to all authorized personnel.`}
             </p>
             
-            {selectedVehicle.stolen_status?.isStolen && (
+            {selectedVehicle.status === 'Stolen' && selectedVehicle.stolen_status && (
               <div className="bg-gray-50 p-3 rounded-lg mb-6 text-xs text-gray-600">
                 <p><strong>Reported At:</strong> {new Date(selectedVehicle.stolen_status.reportedAt || '').toLocaleString()}</p>
                 <p><strong>Reported By:</strong> {selectedVehicle.stolen_status.reportedBy}</p>
@@ -288,9 +297,9 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
               </button>
               <button 
                 onClick={() => handleToggleStolen(selectedVehicle)}
-                className={`flex-1 py-2 text-white font-bold rounded-lg transition ${selectedVehicle.stolen_status?.isStolen ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                className={`flex-1 py-2 text-white font-bold rounded-lg transition ${selectedVehicle.status === 'Stolen' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
               >
-                {selectedVehicle.stolen_status?.isStolen ? 'Confirm Recovery' : 'Confirm Stolen'}
+                {selectedVehicle.status === 'Stolen' ? 'Confirm Recovery' : 'Confirm Stolen'}
               </button>
             </div>
           </div>

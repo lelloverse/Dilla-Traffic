@@ -73,7 +73,7 @@ export const markVehicleAsStolen = async (vehicleId: string, reportedBy: string)
     const { error } = await supabase
         .from('vehicles')
         .update({ 
-            stolen_status: JSON.stringify(status),
+            stolen_status: status,
             status: 'Stolen'
         })
         .eq('id', vehicleId);
@@ -85,7 +85,7 @@ export const unmarkVehicleAsStolen = async (vehicleId: string): Promise<void> =>
     const { error } = await supabase
         .from('vehicles')
         .update({ 
-            stolen_status: JSON.stringify(status),
+            stolen_status: status,
             status: 'Active'
         })
         .eq('id', vehicleId);
