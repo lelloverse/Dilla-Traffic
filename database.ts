@@ -55,7 +55,7 @@ export const updateVehicle = async (vehicle: Vehicle): Promise<void> => {
             owner_phone: v.ownerPhone,
             status: v.status,
             expiry_date: v.expiryDate,
-            stolen_status: v.stolenStatus,
+            stolen_status: v.stolen_status,
             // Additional fields from Registration Flow
             address: v.address,
             national_id: v.nationalId,

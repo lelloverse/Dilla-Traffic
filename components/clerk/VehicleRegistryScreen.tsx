@@ -30,17 +30,38 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
 
   const handleToggleStolen = async (vehicle: Vehicle) => {
     const currentUser = 'Clerk-User'; // In a real app, get from auth context
-    if (vehicle.stolen_status?.isStolen) {
-      await unmarkVehicleAsStolen(vehicle.id);
-      addToast(`Vehicle ${vehicle.plateNumber} unmarked as stolen`, 'success');
-    } else {
-      await markVehicleAsStolen(vehicle.id, currentUser);
-      addToast(`Vehicle ${vehicle.plateNumber} marked as STOLEN`, 'error');
+    const wasStolen = vehicle.stolen_status?.isStolen;
+
+    try {
+      if (wasStolen) {
+        await unmarkVehicleAsStolen(vehicle.id);
+        addToast(`Vehicle ${vehicle.plateNumber} unmarked as stolen`, 'success');
+      } else {
+        await markVehicleAsStolen(vehicle.id, currentUser);
+        addToast(`Vehicle ${vehicle.plateNumber} marked as STOLEN`, 'error');
+      }
+
+      // On success, update state locally to avoid a full refetch
+      setVehicles(currentVehicles =>
+        currentVehicles.map(v => {
+          if (v.id === vehicle.id) {
+            return {
+              ...v,
+              stolen_status: wasStolen
+                ? { ...v.stolen_status!, isStolen: false }
+                : { isStolen: true, reportedBy: currentUser, reportedAt: new Date().toISOString() }
+            };
+          }
+          return v;
+        })
+      );
+    } catch (error) {
+      console.error("Failed to update stolen status:", error);
+      addToast('Failed to update vehicle status. Please try again.', 'error');
+    } finally {
+      setShowStolenModal(false);
+      setSelectedVehicle(null);
     }
-    const updatedVehicles = await getVehicles();
-    setVehicles(updatedVehicles);
-    setShowStolenModal(false);
-    setSelectedVehicle(null);
   };
 
   const filteredVehicles = (vehicles || []).filter(v => {
