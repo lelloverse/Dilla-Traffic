@@ -29,7 +29,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
   }, []);
 
   const handleToggleStolen = async (vehicle: Vehicle) => {
-    const currentUser = 'Clerk-User'; // In a real app, get from auth context
+    const currentUser = 'Clerk'; // In a real app, get from auth context
     const wasStolen = vehicle.stolen_status?.isStolen;
 
     try {
