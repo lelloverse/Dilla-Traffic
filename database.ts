@@ -72,7 +72,10 @@ export const markVehicleAsStolen = async (vehicleId: string, reportedBy: string)
     const status = { isStolen: true, reportedAt: new Date().toISOString(), reportedBy };
     const { error } = await supabase
         .from('vehicles')
-        .update({ stolen_status: JSON.stringify(status) })
+        .update({ 
+            stolen_status: JSON.stringify(status),
+            status: 'Stolen'
+        })
         .eq('id', vehicleId);
     if (error) throw error;
 };
@@ -81,7 +84,10 @@ export const unmarkVehicleAsStolen = async (vehicleId: string): Promise<void> =>
     const status = { isStolen: false };
     const { error } = await supabase
         .from('vehicles')
-        .update({ stolen_status: JSON.stringify(status) })
+        .update({ 
+            stolen_status: JSON.stringify(status),
+            status: 'Active'
+        })
         .eq('id', vehicleId);
     if (error) throw error;
 };
