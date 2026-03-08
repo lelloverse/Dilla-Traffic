@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { addPayment, getPayments } from '../../database';
 import { Payment } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from 'react-i18next';
 
 interface PaymentProcessingScreenProps {
   onBack: () => void;
 }
 
 const PaymentProcessingScreen: React.FC<PaymentProcessingScreenProps> = ({ onBack }) => {
+    const { t } = useTranslation();
     const { addToast } = useToast();
     const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
     const [formData, setFormData] = useState<Payment>({
@@ -26,7 +28,7 @@ const PaymentProcessingScreen: React.FC<PaymentProcessingScreenProps> = ({ onBac
     useEffect(() => {
         const fetchPayments = async () => {
             const data = await getPayments();
-            setRecentPayments(data.slice(-5).reverse());
+            setRecentPayments(data.slice().reverse());
         };
         fetchPayments();
     }, []);
@@ -35,10 +37,10 @@ const PaymentProcessingScreen: React.FC<PaymentProcessingScreenProps> = ({ onBac
         let error = '';
         switch(name) {
             case 'payerName':
-                if (!value.trim()) error = 'Payer name is required';
+                if (!value.trim()) error = t('payerNameRequired');
                 break;
             case 'amount':
-                if (!value || parseFloat(value) <= 0) error = 'Amount must be greater than 0';
+                if (!value || parseFloat(value) <= 0) error = t('amountInvalid');
                 break;
         }
         return error;
@@ -73,7 +75,7 @@ const PaymentProcessingScreen: React.FC<PaymentProcessingScreenProps> = ({ onBac
 
         await addPayment(formData);
         const updatedPayments = await getPayments();
-        setRecentPayments(updatedPayments.slice(-5).reverse());
+        setRecentPayments(updatedPayments.slice().reverse());
         // Reset form but keep date
         setFormData({
              id: 'RCP-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 10000),
@@ -86,7 +88,7 @@ const PaymentProcessingScreen: React.FC<PaymentProcessingScreenProps> = ({ onBac
         });
         setTouched({});
         setErrors({});
-        addToast("Payment Processed Successfully!", "success");
+        addToast(t('paymentSuccess'), "success");
     }
 
     const getInputClass = (fieldName: string) => {
@@ -107,58 +109,58 @@ const PaymentProcessingScreen: React.FC<PaymentProcessingScreenProps> = ({ onBac
     <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-xl p-8 border border-gray-100">
         <div className="flex justify-between items-center mb-6 border-b pb-4 border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800">Payments & Revenue</h1>
+            <h1 className="text-2xl font-bold text-gray-800">{t('paymentsRevenueTitle')}</h1>
             <button
                 onClick={onBack}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
             >
-                Back to Dashboard
+                {t('backToDashboard')}
             </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Payment Form */}
             <div className="lg:col-span-2">
-                <h2 className="text-xl font-semibold mb-4">Process New Payment</h2>
+                <h2 className="text-xl font-semibold mb-4">{t('processNewPayment')}</h2>
                 <form onSubmit={handleSubmit} className="bg-gray-50 p-6 rounded-lg space-y-4 border border-gray-100">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">Receipt Number</label>
+                            <label className="block text-sm font-medium mb-1">{t('receiptNumber')}</label>
                             <input name="id" value={formData.id} readOnly className="w-full p-2 border rounded bg-gray-200 border-gray-300" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Payer Name <span className="text-red-500">*</span></label>
+                            <label className="block text-sm font-medium mb-1">{t('payerName')} <span className="text-red-500">*</span></label>
                             <input 
                                 name="payerName" 
                                 value={formData.payerName} 
                                 onChange={handleChange} 
                                 onBlur={handleBlur}
                                 className={getInputClass('payerName')} 
-                                placeholder="Full Name" 
+                                placeholder={t('payerNamePlaceholder')} 
                             />
                             {renderError('payerName')}
                         </div>
                          <div>
-                            <label className="block text-sm font-medium mb-1">Service Type</label>
+                            <label className="block text-sm font-medium mb-1">{t('serviceType')}</label>
                             <select name="serviceType" value={formData.serviceType} onChange={handleChange} className="w-full p-2 border rounded bg-white border-gray-300">
-                                <option value="vehicle_registration">Vehicle Registration</option>
-                                <option value="license_fee">Driver License Fee</option>
-                                <option value="plate_fee">Plate Issuance Fee</option>
-                                <option value="renewal_fee">Renewal Fee</option>
+                                <option value="vehicle_registration">{t('vehicleRegistration')}</option>
+                                <option value="license_fee">{t('licenseFee')}</option>
+                                <option value="plate_fee">{t('plateFee')}</option>
+                                <option value="renewal_fee">{t('renewalFee')}</option>
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Payment Method</label>
+                            <label className="block text-sm font-medium mb-1">{t('paymentMethod')}</label>
                             <select name="paymentMethod" value={formData.paymentMethod} onChange={handleChange} className="w-full p-2 border rounded bg-white border-gray-300">
-                                <option value="cash">Cash</option>
-                                <option value="card">Card</option>
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="mobile_money">Mobile Money (Telebirr)</option>
-                                <option value="cheque">Cheque</option>
+                                <option value="cash">{t('cash')}</option>
+                                <option value="card">{t('card')}</option>
+                                <option value="bank_transfer">{t('bankTransfer')}</option>
+                                <option value="mobile_money">{t('mobileMoney')}</option>
+                                <option value="cheque">{t('cheque')}</option>
                             </select>
                         </div>
                         <div className="md:col-span-2">
-                             <label className="block text-sm font-medium mb-1">Amount (ETB) <span className="text-red-500">*</span></label>
+                             <label className="block text-sm font-medium mb-1">{t('amountEtb')} <span className="text-red-500">*</span></label>
                             <input 
                                 type="number" 
                                 name="amount" 
@@ -171,32 +173,32 @@ const PaymentProcessingScreen: React.FC<PaymentProcessingScreenProps> = ({ onBac
                             {renderError('amount')}
                         </div>
                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium mb-1">Notes</label>
+                            <label className="block text-sm font-medium mb-1">{t('notes')}</label>
                             <textarea name="notes" value={formData.notes} onChange={handleChange} className="w-full p-2 border rounded bg-white border-gray-300" rows={2}></textarea>
                         </div>
                      </div>
-                     <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">Process Payment</button>
+                     <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">{t('processPayment')}</button>
                 </form>
             </div>
 
             {/* Recent Payments Sidebar */}
             <div>
-                 <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
-                 <div className="space-y-4">
+                 <h2 className="text-xl font-semibold mb-4">{t('recentTransactions')}</h2>
+                 <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2">
                      {recentPayments.length > 0 ? recentPayments.map(p => (
-                         <div key={p.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                         <div key={p.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
                              <div className="flex justify-between items-start mb-2">
                                  <div>
                                      <p className="font-bold text-gray-800">{p.payerName}</p>
                                      <p className="text-xs text-gray-500">{p.id}</p>
                                  </div>
-                                 <span className="font-bold text-green-600">ETB {p.amount}</span>
+                                 <span className="font-bold text-green-600">ETB {p.amount.toLocaleString()}</span>
                              </div>
-                             <p className="text-sm text-gray-700">{p.serviceType.replace('_', ' ')}</p>
-                             <p className="text-xs text-gray-500 mt-1 uppercase">{p.paymentMethod}</p>
+                             <p className="text-sm text-gray-700">{t(p.serviceType)}</p>
+                             <p className="text-xs text-gray-500 mt-1 uppercase">{t(p.paymentMethod)}</p>
                          </div>
                      )) : (
-                         <p className="text-gray-500 italic">No recent payments recorded.</p>
+                         <p className="text-gray-500 italic">{t('noRecentPayments')}</p>
                      )}
                  </div>
             </div>

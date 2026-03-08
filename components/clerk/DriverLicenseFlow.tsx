@@ -2,19 +2,22 @@ import React, { useState } from 'react';
 import { updateApplication, updateDriver, addAuditLog } from '../../database';
 import { Application, ApplicationType, ApplicationStatus, Driver } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from 'react-i18next';
 
 interface DriverLicenseFlowProps {
   onBack: () => void;
 }
 
-const steps = [
-  "Applicant Identity",
-  "Contact & Address",
-  "Review & Submit"
-];
-
 const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
+  const { t } = useTranslation();
   const { addToast } = useToast();
+
+  const steps = [
+    t('applicantIdentity'),
+    t('contactAddress'),
+    t('reviewSubmit')
+  ];
+
   const [currentStep, setCurrentStep] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [formData, setFormData] = useState({
@@ -34,14 +37,14 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
       let error = '';
       switch(name) {
           case 'firstName':
-              if (!value.trim()) error = 'First name is required';
+              if (!value.trim()) error = t('firstName') + ' is required';
               else if (value.length < 2) error = 'Name too short';
               break;
           case 'lastName':
-              if (!value.trim()) error = 'Last name is required';
+              if (!value.trim()) error = t('lastName') + ' is required';
               break;
           case 'dob':
-              if (!value) error = 'Date of birth is required';
+              if (!value) error = t('dob') + ' is required';
               else {
                   const birthDate = new Date(value);
                   const today = new Date();
@@ -54,11 +57,11 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
               }
               break;
           case 'phone':
-              if (!value.trim()) error = 'Phone number is required';
+              if (!value.trim()) error = t('phoneNumber') + ' is required';
               else if (!/^[\d\+\-\s]{10,}$/.test(value)) error = 'Invalid phone format (e.g. +251...)';
               break;
           case 'address':
-              if (!value.trim()) error = 'Address is required';
+              if (!value.trim()) error = t('address') + ' is required';
               break;
       }
       return error;
@@ -169,7 +172,7 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
           status: 'success'
       });
 
-      addToast("Application Submitted Successfully!", "success");
+      addToast(t('applicationSuccess'), "success");
       onBack();
   }
 
@@ -191,21 +194,21 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
       switch(currentStep) {
           case 1: return (
               <div className="space-y-4">
-                  <h3 className="text-lg font-medium mb-4 border-b pb-2">Applicant Identity</h3>
+                  <h3 className="text-lg font-medium mb-4 border-b pb-2">{t('applicantIdentity')}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                          <label className="block text-sm font-medium mb-1">Application ID</label>
+                          <label className="block text-sm font-medium mb-1">{t('applicationId')}</label>
                           <input value={formData.appId} readOnly className="w-full p-2 border rounded bg-gray-200 cursor-not-allowed" />
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Gender</label>
+                          <label className="block text-sm font-medium mb-1">{t('gender')}</label>
                           <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50 border-gray-300">
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
+                              <option value="Male">{t('male')}</option>
+                              <option value="Female">{t('female')}</option>
                           </select>
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">First Name <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('firstName')} <span className="text-red-500">*</span></label>
                           <input 
                             name="firstName" 
                             value={formData.firstName} 
@@ -217,7 +220,7 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
                           {renderError('firstName')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Last Name <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('lastName')} <span className="text-red-500">*</span></label>
                           <input 
                             name="lastName" 
                             value={formData.lastName} 
@@ -229,7 +232,7 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
                           {renderError('lastName')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Date of Birth <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('dob')} <span className="text-red-500">*</span></label>
                           <input 
                             type="date" 
                             name="dob" 
@@ -245,10 +248,10 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
           );
           case 2: return (
               <div className="space-y-4">
-                  <h3 className="text-lg font-medium mb-4 border-b pb-2">Contact & Address</h3>
+                  <h3 className="text-lg font-medium mb-4 border-b pb-2">{t('contactAddress')}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="md:col-span-2">
-                          <label className="block text-sm font-medium mb-1">Residential Address <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('residentialAddress')} <span className="text-red-500">*</span></label>
                           <input 
                             name="address" 
                             value={formData.address} 
@@ -260,7 +263,7 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
                           {renderError('address')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Phone Number <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('phoneNumber')} <span className="text-red-500">*</span></label>
                           <input 
                             name="phone" 
                             value={formData.phone} 
@@ -277,14 +280,14 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
           case 3: return (
             <div className="space-y-6">
                 <div className="text-center">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">Confirm Application</h3>
-                    <p className="text-gray-500">This application will be submitted for officer review.</p>
+                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{t('confirmApplication')}</h3>
+                    <p className="text-gray-500">{t('officerReviewText')}</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg flex flex-col items-center">
                     <p className="text-lg font-bold">{formData.firstName} {formData.lastName}</p>
-                    <p>DOB: {formData.dob}</p>
-                    <p>Phone: {formData.phone}</p>
-                    <p className="text-sm text-gray-500 mt-2">App ID: {formData.appId}</p>
+                    <p>{t('dob')}: {formData.dob}</p>
+                    <p>{t('phoneNumber')}: {formData.phone}</p>
+                    <p className="text-sm text-gray-500 mt-2">{t('applicationId')}: {formData.appId}</p>
                 </div>
             </div>
           );
@@ -295,8 +298,8 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-xl p-8 border border-gray-100">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">New Driver License Application</h1>
-        <p className="text-gray-500 mb-6">{`Step ${currentStep} of ${steps.length}: ${steps[currentStep-1]}`}</p>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">{t('newDriverLicenseApp')}</h1>
+        <p className="text-gray-500 mb-6">{t('stepOutOf', { current: currentStep, total: steps.length, step: steps[currentStep-1] })}</p>
         
         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-8">
           <div className="bg-green-600 h-2.5 rounded-full" style={{ width: `${(currentStep / steps.length) * 100}%` }}></div>
@@ -311,7 +314,7 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
             onClick={onBack}
             className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <div className="flex gap-4">
             {currentStep > 1 && (
@@ -319,7 +322,7 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
                 onClick={handlePrev}
                 className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
               >
-                Previous
+                {t('previous')}
               </button>
             )}
             {currentStep < steps.length ? (
@@ -327,14 +330,14 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
                 onClick={handleNext}
                 className={`px-6 py-2 bg-green-600 text-white rounded-lg transition ${!isStepValid() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
               >
-                Next
+                {t('next')}
               </button>
             ) : (
                 <button
                 onClick={handleSubmitClick}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                 >
-                Submit Application
+                {t('submitApplication')}
                 </button>
             )}
           </div>
@@ -345,16 +348,16 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
       {showConfirmation && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 animate-fade-in">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Submission</h3>
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">{t('confirmSubmission')}</h3>
                   <p className="text-gray-600 mb-6">
                       Are you sure you want to submit this application? Please verify the details below one last time.
                   </p>
                   
                   <div className="bg-gray-50 p-4 rounded-lg mb-6 text-sm space-y-2">
-                      <p><span className="font-semibold">Applicant:</span> {formData.firstName} {formData.lastName}</p>
-                      <p><span className="font-semibold">DOB:</span> {formData.dob}</p>
-                      <p><span className="font-semibold">Phone:</span> {formData.phone}</p>
-                      <p><span className="font-semibold">Address:</span> {formData.address}</p>
+                      <p><span className="font-semibold">{t('firstName')}:</span> {formData.firstName} {formData.lastName}</p>
+                      <p><span className="font-semibold">{t('dob')}:</span> {formData.dob}</p>
+                      <p><span className="font-semibold">{t('phoneNumber')}:</span> {formData.phone}</p>
+                      <p><span className="font-semibold">{t('address')}:</span> {formData.address}</p>
                   </div>
 
                   <div className="flex justify-end gap-3">
@@ -362,13 +365,13 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
                         onClick={() => setShowConfirmation(false)}
                         className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
                       >
-                          Edit Details
+                          {t('editDetails')}
                       </button>
                       <button 
                         onClick={confirmSubmit}
                         className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
                       >
-                          Confirm & Submit
+                          {t('confirmAndSubmit')}
                       </button>
                   </div>
               </div>

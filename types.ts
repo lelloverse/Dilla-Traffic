@@ -70,7 +70,7 @@ export interface Vehicle {
     ownerName: string;
     ownerPhone: string;
     type: 'private' | 'commercial' | 'motorcycle' | 'truck' | 'bus';
-    status: 'Active' | 'Expired' | 'Suspended';
+    status: 'Active' | 'Expired' | 'Suspended' | 'Stolen';
     expiryDate: string;
     stolen_status?: {
         isStolen: boolean;

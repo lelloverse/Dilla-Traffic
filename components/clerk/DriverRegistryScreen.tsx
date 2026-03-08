@@ -115,20 +115,14 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b pb-4 border-gray-200">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Driver Registry</h1>
-          <p className="text-gray-500 mt-1">Maintains records of all drivers and detailed registration information</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('driverRegistryTitle')}</h1>
+          <p className="text-gray-500 mt-1">{t('driverRegistryDesc')}</p>
         </div>
         
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-100">
-              <p className="text-xs text-green-600 font-bold uppercase tracking-wider">{t('licensedDrivers')}</p>
-              <p className="text-xl font-black text-green-900">{drivers.filter(d => d.status === 'Active').length}</p>
-            </div>
-            <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100">
-              <p className="text-xs text-red-600 font-bold uppercase tracking-wider">{t('suspended')}</p>
-              <p className="text-xl font-black text-red-900">{drivers.filter(d => d.status === 'Suspended').length}</p>
-            </div>
+          <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-100 text-center">
+            <p className="text-xs text-green-600 font-bold uppercase tracking-wider">{t('totalActiveDrivers')}</p>
+            <p className="text-xl font-black text-green-900">{drivers.filter(d => d.status === 'Active').length}</p>
           </div>
           <button 
             onClick={onBack}
@@ -147,7 +141,7 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
           </span>
           <input 
             type="text"
-            placeholder="Search by license #, name, phone..."
+            placeholder={t('searchDriversPlaceholder')}
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -156,24 +150,13 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
         
         <div className="flex gap-2 w-full md:w-auto">
           <select 
-            className="flex-1 md:w-40 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="all">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Expired">Expired</option>
-            <option value="Suspended">Suspended</option>
-          </select>
-
-          <select 
-            className="flex-1 md:w-40 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 md:w-48 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={filterGender}
             onChange={(e) => setFilterGender(e.target.value)}
           >
-            <option value="all">All Genders</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
+            <option value="all">{t('allGenders')}</option>
+            <option value="Male">{t('male')}</option>
+            <option value="Female">{t('female')}</option>
           </select>
         </div>
       </div>
@@ -184,12 +167,12 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Driver Info</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Contact</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Expiry</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Associated Vehicles</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('driverInfo')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('contact')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('status')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('expiry')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('associatedVehicles')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -203,7 +186,7 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
                         </div>
                         <div>
                           <p className="font-bold text-gray-900">{d.fullName}</p>
-                          <p className="text-xs text-gray-500 font-medium">License: {d.licenseNumber}</p>
+                          <p className="text-xs text-gray-500 font-medium">{t('licenseNumber')}: {d.licenseNumber}</p>
                         </div>
                       </div>
                     </td>
@@ -216,7 +199,7 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(d.status)}`}>
-                        {d.status}
+                        {t(d.status.toLowerCase())}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -229,19 +212,19 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
                       <div className="flex flex-wrap gap-1">
                         {d.associatedVehicles.length > 0 ? (
                           d.associatedVehicles.map(v => (
-                            <span key={v} className="flex items-center px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold border border-gray-200">
+                            <span key={v} className="flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200">
                               <span className="mr-1 opacity-60 flex items-center"><FaCar size={10} /></span> {v}
                               <button 
                                 onClick={() => handleRemoveVehicle(d, v)}
                                 className="ml-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                                title="Remove association"
+                                title={t('removeAssociation')}
                               >
                                 ×
                               </button>
                             </span>
                           ))
                         ) : (
-                          <span className="text-xs text-gray-400 italic">None</span>
+                          <span className="text-xs text-gray-400 italic">{t('none')}</span>
                         )}
                         <button 
                           onClick={() => {
@@ -251,13 +234,13 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
                           }}
                           className="flex items-center px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold border border-blue-100 hover:bg-blue-600 hover:text-white transition-colors"
                         >
-                          <span className="mr-1 flex items-center"><FaPlus size={8} /></span> Add
+                          <span className="mr-1 flex items-center"><FaPlus size={8} /></span> {t('add')}
                         </button>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
-                        View Details
+                        {t('viewDetails')}
                       </button>
                     </td>
                   </tr>
@@ -265,7 +248,7 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500 italic">
-                    No drivers found matching your criteria.
+                    {t('noDriversFound')}
                   </td>
                 </tr>
               )}
@@ -280,8 +263,8 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-scale-up">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Associate Vehicle</h3>
-                <p className="text-sm text-gray-500">Add vehicle for {selectedDriver.fullName}</p>
+                <h3 className="text-xl font-bold text-gray-900">{t('associateVehicle')}</h3>
+                <p className="text-sm text-gray-500">{t('addVehicleFor', { name: selectedDriver.fullName })}</p>
               </div>
               <button 
                 onClick={() => setShowAssociateModal(false)}
@@ -298,7 +281,7 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
                 </span>
                 <input 
                   type="text"
-                  placeholder="Search vehicles by plate, make..."
+                  placeholder={t('searchVehiclesByPlate')}
                   className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   value={vehicleSearch}
                   onChange={(e) => setVehicleSearch(e.target.value)}
@@ -331,13 +314,13 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
                             : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow-md'
                         }`}
                       >
-                        {selectedDriver.associatedVehicles.includes(v.plateNumber) ? 'Added' : 'Associate'}
+                        {selectedDriver.associatedVehicles.includes(v.plateNumber) ? t('added') : t('associate')}
                       </button>
                     </div>
                   ))
                 ) : (
                   <div className="py-8 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                    <p className="text-xs text-gray-400 italic">No matching vehicles found</p>
+                    <p className="text-xs text-gray-400 italic">{t('noRecentTrans')}</p>
                   </div>
                 )}
               </div>
@@ -347,7 +330,7 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
                   onClick={() => setShowAssociateModal(false)}
                   className="px-6 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition"
                 >
-                  Done
+                  {t('done')}
                 </button>
               </div>
             </div>

@@ -115,7 +115,7 @@ const ClerkDashboard: React.FC<ClerkDashboardProps> = ({ onNavigate, userRole })
     );
   }
 
-  const recentPayments = payments.slice(-5).reverse();
+  const recentPayments = payments.slice().reverse();
 
   // Calculate stats
   const paidViolationsCount = violations.filter(v => v.status === 'Paid').length;
@@ -213,22 +213,22 @@ const ClerkDashboard: React.FC<ClerkDashboardProps> = ({ onNavigate, userRole })
           </>
         )}
         <ModuleCard 
-          title="Traffic Violations"
-          description={isOfficer ? "Enforcement tools: Issue and track violations" : "Manage and track traffic violation records and payments"}
+          title={t('trafficViolations')}
+          description={isOfficer ? t('trafficViolationsOfficerDesc') : t('trafficViolationsClerkDesc')}
           btnText={t('accessModule')}
           icon={<FaFileInvoiceDollar size={32} color="#ef4444" />}
           onClick={() => onNavigate('violations')}
         />
         <ModuleCard 
-          title={t('Vehicle stock')}
-          description={t('Maintains records of all vehicles and detailed registration information')}
+          title={t('vehicleStock')}
+          description={t('vehicleStockDesc')}
           btnText={t('accessModule')}
           icon={<FaCar size={32} color="#2563eb" />}
           onClick={() => onNavigate('vehicles')}
         />
         <ModuleCard 
-          title={t('Drivers stock')}
-          description={t('Maintains records of all drivers and detailed registration information')}
+          title={t('driverStock')}
+          description={t('driverStockDesc')}
           btnText={t('accessModule')}
           icon={<FaIdCard size={32} color="#16a34a" />}
           onClick={() => onNavigate('drivers')}
@@ -246,9 +246,9 @@ const ClerkDashboard: React.FC<ClerkDashboardProps> = ({ onNavigate, userRole })
       <div className="mb-12">
         <h2 className="text-xl font-bold text-gray-900 mb-4">{t('recentTransactions')}</h2>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                 <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+                    <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200 sticky top-0 z-10">
                         <tr>
                             <th className="px-6 py-3">{t('payerName')}</th>
                             <th className="px-6 py-3">{t('serviceType')}</th>

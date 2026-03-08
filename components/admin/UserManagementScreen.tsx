@@ -5,12 +5,14 @@ import { getUsers, updateUser, addUser, addAuditLog } from '../../database';
 import { useToast } from '../../context/ToastContext';
 import { FaUserPlus, FaShieldAlt } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
+import { useTranslation } from 'react-i18next';
 
 interface UserManagementScreenProps {
   onBack: () => void;
 }
 
 const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) => {
+    const { t } = useTranslation();
     const { addToast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -56,9 +58,9 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                 ipAddress: 'internal'
             });
 
-            addToast(`User ${user.name} has been ${newStatus === 'Active' ? 'activated' : 'deactivated'}`, "success");
+            addToast(t('userStatusChanged', { name: user.name, status: newStatus === 'Active' ? t('activated') : t('deactivated') }), "success");
         } catch (error) {
-            addToast("Failed to update user status", "error");
+            addToast(t('failedToUpdateStatus'), "error");
         }
     };
 
@@ -94,12 +96,12 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
             if (isCreating) {
                 // Validation
                 if (!newUser.name || !newUser.username || !newUser.email || !newUser.password) {
-                    addToast("All fields are required", "error");
+                    addToast(t('allFieldsRequired'), "error");
                     return;
                 }
 
                 if (!validatePassword(newUser.password)) {
-                    addToast("Password must be at least 8 characters", "error");
+                    addToast(t('passwordMinLength'), "error");
                     return;
                 }
 
@@ -144,7 +146,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                     });
 
                     setUsers([...users, createdUser]);
-                    addToast(`User ${createdUser.name} created successfully`, "success");
+                    addToast(t('userCreatedSuccess', { name: createdUser.name }), "success");
                 }
             } else if (selectedUser) {
                 const oldUser = users.find(u => u.id === selectedUser.id);
@@ -162,12 +164,12 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                 }
 
                 setUsers(users.map(u => u.id === selectedUser.id ? selectedUser : u));
-                addToast(`User ${selectedUser.name} updated successfully`, "success");
+                addToast(t('userUpdatedSuccess', { name: selectedUser.name }), "success");
             }
             setShowEditModal(false);
             setSelectedUser(null);
         } catch (error: any) {
-            addToast(error.message || "An error occurred", "error");
+            addToast(error.message || t('errorOccurred'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -177,7 +179,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
         if (!selectedUser || !resetPasswordValue.trim()) return;
         
         if (!validatePassword(resetPasswordValue)) {
-            addToast("Password must be at least 8 characters", "error");
+            addToast(t('passwordMinLength'), "error");
             return;
         }
 
@@ -198,10 +200,10 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                 ipAddress: 'internal'
             });
 
-            addToast("Password reset successfully!", "success");
+            addToast(t('passwordResetSuccess'), "success");
             setResetPasswordValue('');
         } catch (error: any) {
-            addToast(error.message || "Failed to reset password", "error");
+            addToast(error.message || t('failedToResetPassword'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -214,23 +216,23 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
             <div>
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                     <span className="text-blue-600"><FaShieldAlt /></span>
-                    User Management
+                    {t('userManagement')}
                 </h1>
-                <p className="text-gray-500">Manage system access and roles. (Closed System)</p>
+                <p className="text-gray-500">{t('userManagementSubtitle')}</p>
             </div>
             <div className="flex gap-3">
                  <button
                     onClick={onBack}
                     className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
                 >
-                    Back to Dashboard
+                    {t('backToDashboard')}
                 </button>
                 <button 
                     onClick={handleCreateClick}
                     className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
                 >
                     <FaUserPlus size={20} />
-                    Add New User
+                    {t('addNewUser')}
                 </button>
             </div>
         </div>
@@ -240,11 +242,11 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
             <table className="w-full text-sm text-left text-gray-500">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-100">
                     <tr>
-                        <th scope="col" className="px-6 py-3">Name</th>
-                        <th scope="col" className="px-6 py-3">Username / Email</th>
-                        <th scope="col" className="px-6 py-3">Role</th>
-                        <th scope="col" className="px-6 py-3">Status</th>
-                        <th scope="col" className="px-6 py-3 text-right">Actions</th>
+                        <th scope="col" className="px-6 py-3">{t('name')}</th>
+                        <th scope="col" className="px-6 py-3">{t('usernameEmail')}</th>
+                        <th scope="col" className="px-6 py-3">{t('role')}</th>
+                        <th scope="col" className="px-6 py-3">{t('status')}</th>
+                        <th scope="col" className="px-6 py-3 text-right">{t('actions')}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -288,16 +290,16 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                                     user.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                 }`}>
                                     <span className={`h-1.5 w-1.5 rounded-full ${user.status === 'Active' ? 'bg-green-600' : 'bg-red-600'}`}></span>
-                                    {user.status}
+                                    {user.status === 'Active' ? t('active') : t('inactive')}
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                                <button onClick={() => handleEditClick(user)} className="font-medium text-blue-600 hover:underline px-2">Edit</button>
+                                <button onClick={() => handleEditClick(user)} className="font-medium text-blue-600 hover:underline px-2">{t('edit')}</button>
                                 <button 
                                     onClick={() => handleDeactivate(user)} 
                                     className={`font-medium hover:underline px-2 ${user.status === 'Active' ? 'text-red-600' : 'text-green-600'}`}
                                 >
-                                    {user.status === 'Active' ? 'Deactivate' : 'Activate'}
+                                    {user.status === 'Active' ? t('deactivate') : t('activate')}
                                 </button>
                             </td>
                         </tr>
@@ -311,11 +313,11 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
       {showEditModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white p-5 rounded-lg shadow-xl w-full max-w-sm animate-fade-in">
-                  <h3 className="text-lg font-bold mb-3 text-gray-900">{isCreating ? 'Register New User' : `Edit User: ${selectedUser?.name}`}</h3>
+                  <h3 className="text-lg font-bold mb-3 text-gray-900">{isCreating ? t('registerNewUser') : t('editUser', { name: selectedUser?.name })}</h3>
                   <form onSubmit={(e) => { e.preventDefault(); handleSaveChanges(); }}>
                     <div className="space-y-3">
                         <div>
-                            <label className="block text-xs font-medium mb-1 text-gray-700">Full Name</label>
+                            <label className="block text-xs font-medium mb-1 text-gray-700">{t('fullName')}</label>
                             <input 
                                 type="text" 
                                 required
@@ -326,7 +328,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium mb-1 text-gray-700">Email Address</label>
+                            <label className="block text-xs font-medium mb-1 text-gray-700">{t('emailAddress')}</label>
                             <input 
                                 type="email" 
                                 required
@@ -338,7 +340,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium mb-1 text-gray-700">Username</label>
+                            <label className="block text-xs font-medium mb-1 text-gray-700">{t('username')}</label>
                             <input 
                                 type="text" 
                                 required
@@ -350,7 +352,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                             />
                         </div>
                         <div>
-                            <label htmlFor="role" className="block text-xs font-medium mb-1 text-gray-700">Role</label>
+                            <label htmlFor="role" className="block text-xs font-medium mb-1 text-gray-700">{t('role')}</label>
                             <select 
                                 id="role" 
                                 value={isCreating ? newUser.role : selectedUser?.role} 
@@ -369,7 +371,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                                     onChange={e => isCreating ? setNewUser({...newUser, canAccessWeb: e.target.checked}) : setSelectedUser({...selectedUser!, canAccessWeb: e.target.checked})}
                                     className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                 />
-                                <span className="text-xs font-medium text-gray-700 group-hover:text-blue-600 transition">Web Access</span>
+                                <span className="text-xs font-medium text-gray-700 group-hover:text-blue-600 transition">{t('webAccess')}</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <input 
@@ -378,34 +380,34 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                                     onChange={e => isCreating ? setNewUser({...newUser, canAccessMobile: e.target.checked}) : setSelectedUser({...selectedUser!, canAccessMobile: e.target.checked})}
                                     className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                 />
-                                <span className="text-xs font-medium text-gray-700 group-hover:text-blue-600 transition">Mobile Access</span>
+                                <span className="text-xs font-medium text-gray-700 group-hover:text-blue-600 transition">{t('mobileAccess')}</span>
                             </label>
                         </div>
                         
                         {isCreating && (
                              <div>
-                                <label className="block text-xs font-medium mb-1 text-gray-700">Password</label>
+                                <label className="block text-xs font-medium mb-1 text-gray-700">{t('password')}</label>
                                 <input 
                                     type="password" 
                                     required
                                     value={newUser.password}
                                     onChange={e => setNewUser({...newUser, password: e.target.value})}
                                     className="w-full p-1.5 text-sm border rounded bg-white" 
-                                    placeholder="At least 8 characters"
+                                    placeholder={t('passwordMinLength')}
                                 />
-                                <p className="text-[10px] text-gray-500 mt-0.5">Provide a secure password for the user.</p>
+                                <p className="text-[10px] text-gray-500 mt-0.5">{t('provideSecurePassword')}</p>
                             </div>
                         )}
 
                         {!isCreating && (
                              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <label className="block text-xs font-medium mb-1.5 text-gray-700">Security: Reset Password</label>
+                                <label className="block text-xs font-medium mb-1.5 text-gray-700">{t('securityResetPassword')}</label>
                                  <div className="flex gap-2">
                                      <input 
                                         type="password" 
                                         value={resetPasswordValue}
                                         onChange={(e) => setResetPasswordValue(e.target.value)}
-                                        placeholder="New password"
+                                        placeholder={t('newPassword')}
                                         className="flex-1 p-1.5 text-xs border rounded bg-white"
                                      />
                                      <button 
@@ -413,16 +415,16 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                                         onClick={handlePasswordReset}
                                         className="px-2.5 py-1.5 bg-yellow-600 text-white text-xs font-semibold rounded hover:bg-yellow-700 transition"
                                      >
-                                        Reset
+                                        {t('reset')}
                                      </button>
                                  </div>
                             </div>
                         )}
                     </div>
                       <div className="flex justify-end gap-2 mt-6 pt-3 border-t border-gray-200">
-                          <button type="button" onClick={() => setShowEditModal(false)} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition" disabled={isSaving}>Cancel</button>
+                          <button type="button" onClick={() => setShowEditModal(false)} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition" disabled={isSaving}>{t('cancel')}</button>
                           <button type="submit" className="px-3 py-1.5 text-sm bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition disabled:bg-blue-400" disabled={isSaving}>
-                              {isSaving ? 'Saving...' : (isCreating ? 'Register User' : 'Save Changes')}
+                              {isSaving ? t('saving') : (isCreating ? t('registerUser') : t('saveChanges'))}
                           </button>
                       </div>
                   </form>

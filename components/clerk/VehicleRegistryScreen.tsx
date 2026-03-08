@@ -100,8 +100,8 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b pb-4 border-gray-200">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Vehicle Registry</h1>
-          <p className="text-gray-500 mt-1">Maintains records of all vehicles and detailed registration information</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('vehicleRegistryTitle')}</h1>
+          <p className="text-gray-500 mt-1">{t('vehicleRegistryDesc')}</p>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -112,7 +112,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
             </div>
             <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100">
               <p className="text-xs text-red-600 font-bold uppercase tracking-wider">{t('expired')}</p>
-              <p className="text-xl font-black text-red-900">{vehicles.filter(v => v.status === 'Expired').length}</p>
+              <p className="text-xl font-black text-blue-900">{vehicles.filter(v => v.status === 'Expired').length}</p>
             </div>
           </div>
           <button 
@@ -132,7 +132,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
           </span>
           <input 
             type="text"
-            placeholder="Search by plate, owner, make..."
+            placeholder={t('searchVehiclesPlaceholder')}
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -145,12 +145,12 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
           >
-            <option value="all">All Types</option>
-            <option value="private">Private</option>
-            <option value="commercial">Commercial</option>
-            <option value="motorcycle">Motorcycle</option>
-            <option value="truck">Truck</option>
-            <option value="bus">Bus</option>
+            <option value="all">{t('allTypes')}</option>
+            <option value="private">{t('private')}</option>
+            <option value="commercial">{t('commercial')}</option>
+            <option value="motorcycle">{t('motorcycle')}</option>
+            <option value="truck">{t('truck')}</option>
+            <option value="bus">{t('bus')}</option>
           </select>
 
           <select 
@@ -158,11 +158,11 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
           >
-            <option value="all">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Expired">Expired</option>
-            <option value="Suspended">Suspended</option>
-            <option value="Stolen" className="text-red-600 font-bold">STOLEN</option>
+            <option value="all">{t('allStatus')}</option>
+            <option value="Active">{t('active')}</option>
+            <option value="Expired">{t('expired')}</option>
+            <option value="Suspended">{t('suspended')}</option>
+            <option value="Stolen" className="text-red-600 font-bold">{t('stolen')}</option>
           </select>
         </div>
       </div>
@@ -173,12 +173,12 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vehicle Info</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Owner</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Expiry</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('vehicleInfo')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('ownerName')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('vehicleType')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('status')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('expiry')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -193,7 +193,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                         <div>
                           <p className={`font-bold ${v.status === 'Stolen' ? 'text-red-700' : 'text-gray-900'}`}>
                             {v.plateNumber}
-                            {v.status === 'Stolen' && <span className="ml-2 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full animate-pulse">STOLEN</span>}
+                            {v.status === 'Stolen' && <span className="ml-2 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full animate-pulse">{t('stolen')}</span>}
                           </p>
                           <p className="text-xs text-gray-500">{v.year} {v.make} {v.model}</p>
                         </div>
@@ -210,11 +210,11 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 capitalize">{v.type}</span>
+                      <span className="text-sm text-gray-600 capitalize">{t(v.type)}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(v)}`}>
-                        {v.status}
+                        {t(v.status.toLowerCase())}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -230,7 +230,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                             setSelectedVehicle(v);
                             setShowStolenModal(true);
                           }}
-                          title={v.status === 'Stolen' ? "Mark as Recovered" : "Flag as Stolen"}
+                          title={v.status === 'Stolen' ? t('markAsRecovered') : t('flagAsStolen')}
                           className={`p-2 rounded-lg transition-colors ${v.status === 'Stolen' ? 'bg-green-50 text-green-600 hover:bg-green-600 hover:text-white' : 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white'}`}
                         >
                           {v.status === 'Stolen' ? <FaShieldAlt size={16} /> : <FaExclamationTriangle size={16} />}
@@ -244,7 +244,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                           }}
                           className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"
                         >
-                          Stolen
+                          {t(v.status.toLowerCase())}
                         </button>
                       </div>
                     </td>
@@ -253,7 +253,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500 italic">
-                    No vehicles found matching your criteria.
+                    {t('noVehiclesFound')}
                   </td>
                 </tr>
               )}
@@ -270,18 +270,18 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
               {selectedVehicle.status === 'Stolen' ? <FaShieldAlt size={32} /> : <FaExclamationTriangle size={32} />}
             </div>
             <h3 className="text-xl font-bold text-center text-gray-900 mb-2">
-              {selectedVehicle.status === 'Stolen' ? 'Vehicle Recovered?' : 'Report Stolen Vehicle?'}
+              {selectedVehicle.status === 'Stolen' ? t('vehicleRecoveredQuest') : t('reportStolenQuest')}
             </h3>
             <p className="text-gray-500 text-center mb-6">
               {selectedVehicle.status === 'Stolen' 
-                ? `Are you sure you want to unmark vehicle ${selectedVehicle.plateNumber} as stolen? This will restore its previous status.`
-                : `Are you sure you want to mark vehicle ${selectedVehicle.plateNumber} as STOLEN? This status will be visible to all authorized personnel.`}
+                ? t('unmarkStolenConfirm', { plate: selectedVehicle.plateNumber })
+                : t('markStolenConfirm', { plate: selectedVehicle.plateNumber })}
             </p>
             
             {selectedVehicle.status === 'Stolen' && selectedVehicle.stolen_status && (
               <div className="bg-gray-50 p-3 rounded-lg mb-6 text-xs text-gray-600">
-                <p><strong>Reported At:</strong> {new Date(selectedVehicle.stolen_status.reportedAt || '').toLocaleString()}</p>
-                <p><strong>Reported By:</strong> {selectedVehicle.stolen_status.reportedBy}</p>
+                <p><strong>{t('reportedAt')}:</strong> {new Date(selectedVehicle.stolen_status.reportedAt || '').toLocaleString()}</p>
+                <p><strong>{t('reportedBy')}:</strong> {selectedVehicle.stolen_status.reportedBy}</p>
               </div>
             )}
 
@@ -293,13 +293,13 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                 }}
                 className="flex-1 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button 
                 onClick={() => handleToggleStolen(selectedVehicle)}
                 className={`flex-1 py-2 text-white font-bold rounded-lg transition ${selectedVehicle.status === 'Stolen' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
               >
-                {selectedVehicle.status === 'Stolen' ? 'Confirm Recovery' : 'Confirm Stolen'}
+                {selectedVehicle.status === 'Stolen' ? t('confirmRecovery') : t('confirmStolen')}
               </button>
             </div>
           </div>

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { FaChevronLeft, FaExclamationTriangle, FaPlus, FaRegBell, FaMapMarkerAlt, FaCar, FaClock, FaCalendarAlt, FaTimes, FaCheck } from 'react-icons/fa';
+import { FaChevronLeft, FaExclamationTriangle, FaPlus, FaRegBell, FaMapMarkerAlt, FaCar, FaClock, FaCalendarAlt, FaTimes, FaCheck, FaRegBell as FaRegBellIcon } from 'react-icons/fa';
 import { getAlerts, addAlert, updateAlert } from '../../database';
 import { Alert } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from 'react-i18next';
 
 interface ClerkAlertsManagementScreenProps {
   onBack: () => void;
 }
 
 const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = ({ onBack }) => {
+  const { t } = useTranslation();
   const { addToast } = useToast();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,8 +109,8 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
             <span className="text-gray-600"><FaChevronLeft size={20} /></span>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Active Alerts</h1>
-            <p className="text-gray-500">BOLO & Critical Notifications</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('activeAlertsTitle')}</h1>
+            <p className="text-gray-500">{t('boloNotifications')}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -123,7 +125,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm"
           >
             <FaPlus size={14} />
-            <span>New Alert</span>
+            <span>{t('newAlert')}</span>
           </button>
         </div>
       </div>
@@ -145,7 +147,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-3 opacity-90">
                       <FaExclamationTriangle />
-                      <span>{alert.type || 'SYSTEM ALERT'}</span>
+                      <span>{alert.type || t('systemAlert')}</span>
                     </div>
                     <h2 className="text-2xl font-bold mb-3">{alert.title}</h2>
                     <p className="text-white/90 leading-relaxed mb-6 max-w-2xl">
@@ -157,7 +159,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
                         className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl text-sm font-medium transition flex items-center gap-2"
                        >
                          <FaTimes size={12} />
-                         Dismiss
+                         {t('dismiss')}
                        </button>
                     </div>
                   </div>
@@ -171,10 +173,10 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
-                <h2 className="text-xl font-bold text-gray-900">Active BOLOs</h2>
+                <h2 className="text-xl font-bold text-gray-900">{t('activeBolos')}</h2>
               </div>
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Updated {new Date().getMinutes() % 10}m ago
+                {t('updatedAgo', { count: new Date().getMinutes() % 10 })}
               </span>
             </div>
 
@@ -188,7 +190,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
                           {alert.type || 'BOLO'}
                         </span>
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest ${getPriorityColor(alert.priority)}`}>
-                          {alert.priority}
+                          {t(alert.priority.toLowerCase())}
                         </span>
                       </div>
                       <div className="flex flex-col items-end text-gray-400 text-[10px] font-bold">
@@ -216,20 +218,20 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
                       {alert.description}
                       {alert.metadata?.plate && (
                         <div className="mt-2 font-medium text-gray-700">
-                          Plate: {alert.metadata.plate}
+                          {t('plateNumber')}: {alert.metadata.plate}
                         </div>
                       )}
                     </div>
 
                     <button className="w-full bg-gray-50 hover:bg-gray-100 py-4 rounded-2xl text-gray-900 font-bold text-sm transition flex items-center justify-center gap-2 group">
-                      View Full Details
+                      {t('viewFullDetails')}
                       <span className="rotate-180 group-hover:translate-x-1 transition-transform"><FaChevronLeft size={10} /></span>
                     </button>
                     
                     <button 
                       onClick={() => toggleAlertStatus(alert)}
                       className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-500 transition-colors"
-                      title="Deactivate Alert"
+                      title={t('dismiss')}
                     >
                       <FaTimes size={16} />
                     </button>
@@ -239,7 +241,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
             ) : (
               <div className="bg-gray-50 rounded-2xl p-12 text-center">
                 <span className="text-gray-200 mx-auto mb-4 block w-fit"><FaRegBell size={48} /></span>
-                <p className="text-gray-500 font-medium">No active BOLOs at the moment</p>
+                <p className="text-gray-500 font-medium">{t('noActiveBolos')}</p>
               </div>
             )}
           </div>
@@ -251,7 +253,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
           <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
             <div className="p-8 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
-              <h3 className="text-xl font-bold text-gray-900">Register New Alert</h3>
+              <h3 className="text-xl font-bold text-gray-900">{t('registerNewAlert')}</h3>
               <button 
                 onClick={() => setShowAddModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -263,7 +265,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
             <form onSubmit={handleAddAlert} className="p-8 space-y-6">
               {/* Category Selection */}
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Alert Category</label>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{t('alertCategory')}</label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
@@ -275,7 +277,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
                     }`}
                   >
                     <FaExclamationTriangle size={24} />
-                    <span className="font-bold text-sm">System Alert</span>
+                    <span className="font-bold text-sm">{t('systemAlert')}</span>
                   </button>
                   <button
                     type="button"
@@ -295,7 +297,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
               {/* Title & Type */}
               <div className="grid grid-cols-1 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Title</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('title')}</label>
                   <input 
                     type="text" 
                     value={title}
@@ -307,7 +309,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
                 </div>
                 {category === 'BOLO' && (
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">BOLO Type</label>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('boloType')}</label>
                     <input 
                       type="text" 
                       value={type}
@@ -322,19 +324,19 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
               {/* Priority & Location */}
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Priority</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('priority')}</label>
                   <select 
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as any)}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
                   >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
+                    <option value="Low">{t('low')}</option>
+                    <option value="Medium">{t('medium')}</option>
+                    <option value="High">{t('high')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Location</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('location')}</label>
                   <input 
                     type="text" 
                     value={location}
@@ -347,7 +349,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Description / Details</label>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('descriptionDetails')}</label>
                 <textarea 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -360,18 +362,18 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
               {/* BOLO Metadata */}
               {category === 'BOLO' && (
                 <div className="bg-blue-50 p-6 rounded-2xl space-y-4">
-                  <label className="block text-xs font-bold text-blue-400 uppercase tracking-widest">Additional BOLO Info</label>
+                  <label className="block text-xs font-bold text-blue-400 uppercase tracking-widest">{t('additionalBoloInfo')}</label>
                   <div className="grid grid-cols-2 gap-4">
                     <input 
                       type="text" 
-                      placeholder="Plate Number"
+                      placeholder={t('plateNumber')}
                       value={metadata.plate}
                       onChange={(e) => setMetadata({ ...metadata, plate: e.target.value })}
                       className="w-full px-4 py-2 bg-white border border-blue-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm font-medium"
                     />
                     <input 
                       type="text" 
-                      placeholder="Vehicle Color"
+                      placeholder={t('vehicleColor')}
                       value={metadata.color}
                       onChange={(e) => setMetadata({ ...metadata, color: e.target.value })}
                       className="w-full px-4 py-2 bg-white border border-blue-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm font-medium"
@@ -386,7 +388,7 @@ const ClerkAlertsManagementScreen: React.FC<ClerkAlertsManagementScreenProps> = 
                   className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
                 >
                   <FaCheck />
-                  Register Alert
+                  {t('registerAlert')}
                 </button>
               </div>
             </form>

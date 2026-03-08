@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { addPlate, getPlates } from '../../database';
 import { PlateItem } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from 'react-i18next';
 
 interface ClerkPlateManagementScreenProps {
   onBack: () => void;
 }
 
 const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({ onBack }) => {
+    const { t } = useTranslation();
     const { addToast } = useToast();
     const [plates, setPlates] = useState<PlateItem[]>([]);
     const [formData, setFormData] = useState<PlateItem>({
@@ -24,7 +26,7 @@ const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({
     useEffect(() => {
         const fetchPlates = async () => {
             const data = await getPlates();
-            setPlates(data);
+            setPlates(data.slice().reverse());
         };
         fetchPlates();
     }, []);
@@ -32,7 +34,7 @@ const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({
     const validateField = (name: string, value: string): string => {
         let error = '';
         if (name === 'plateNumber') {
-            if (!value.trim()) error = 'Plate Number is required';
+            if (!value.trim()) error = t('plateNumber') + ' is required';
             // You could add specific plate format regex here if needed
         }
         return error;
@@ -65,7 +67,7 @@ const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({
 
         await addPlate(formData);
         const updatedPlates = await getPlates();
-        setPlates(updatedPlates);
+        setPlates(updatedPlates.slice().reverse());
         setFormData({
             plateNumber: '',
             type: 'private',
@@ -95,22 +97,22 @@ const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({
     <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-xl p-8 border border-gray-100">
         <div className="flex justify-between items-center mb-6 border-b pb-4 border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800">Plate Stock Management</h1>
+            <h1 className="text-2xl font-bold text-gray-800">{t('plateStockManagement')}</h1>
             <button
                 onClick={onBack}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
             >
-                Back to Dashboard
+                {t('backToDashboard')}
             </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Add New Plate Form */}
             <div>
-                 <h2 className="text-xl font-semibold mb-4">Add New Inventory</h2>
+                 <h2 className="text-xl font-semibold mb-4">{t('addNewInventory')}</h2>
                  <form onSubmit={handleSubmit} className="bg-gray-50 p-6 rounded-lg space-y-4 border border-gray-100">
                      <div>
-                         <label className="block text-sm font-medium mb-1">Plate Number <span className="text-red-500">*</span></label>
+                         <label className="block text-sm font-medium mb-1">{t('plateNumber')} <span className="text-red-500">*</span></label>
                          <input 
                             name="plateNumber" 
                             value={formData.plateNumber} 
@@ -122,63 +124,63 @@ const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({
                          {renderError('plateNumber')}
                      </div>
                      <div>
-                         <label className="block text-sm font-medium mb-1">Plate Type</label>
+                         <label className="block text-sm font-medium mb-1">{t('plateType')}</label>
                          <select name="type" value={formData.type} onChange={handleChange} className="w-full p-2 border rounded bg-white border-gray-300">
-                             <option value="private">Private</option>
-                             <option value="commercial">Commercial</option>
-                             <option value="government">Government</option>
-                             <option value="diplomatic">Diplomatic</option>
+                             <option value="private">{t('private')}</option>
+                             <option value="commercial">{t('commercial')}</option>
+                             <option value="government">{t('government')}</option>
+                             <option value="diplomatic">{t('diplomatic')}</option>
                          </select>
                      </div>
                       <div>
-                         <label className="block text-sm font-medium mb-1">Date Received</label>
+                         <label className="block text-sm font-medium mb-1">{t('dateReceived')}</label>
                          <input type="date" name="dateReceived" value={formData.dateReceived} onChange={handleChange} className="w-full p-2 border rounded bg-white border-gray-300" />
                      </div>
                      <div>
-                         <label className="block text-sm font-medium mb-1">Initial Status</label>
+                         <label className="block text-sm font-medium mb-1">{t('initialStatus')}</label>
                          <select name="status" value={formData.status} onChange={handleChange} className="w-full p-2 border rounded bg-white border-gray-300">
-                             <option value="available">Available</option>
-                             <option value="assigned">Assigned</option>
-                             <option value="lost">Lost</option>
-                             <option value="defaced">Defaced</option>
+                             <option value="available">{t('available')}</option>
+                             <option value="assigned">{t('assigned')}</option>
+                             <option value="lost">{t('lost')}</option>
+                             <option value="defaced">{t('defaced')}</option>
                          </select>
                      </div>
                      <div>
-                         <label className="block text-sm font-medium mb-1">Notes</label>
+                         <label className="block text-sm font-medium mb-1">{t('notes')}</label>
                          <textarea name="notes" value={formData.notes} onChange={handleChange} className="w-full p-2 border rounded bg-white border-gray-300" placeholder="e.g. Batch from Manufacturer X"></textarea>
                      </div>
-                     <button type="submit" className="w-full py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">Add to Stock</button>
+                     <button type="submit" className="w-full py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">{t('addToStock')}</button>
                  </form>
             </div>
 
             {/* Inventory List */}
             <div>
-                <h2 className="text-xl font-semibold mb-4">Current Stock</h2>
-                <div className="bg-white border rounded-lg overflow-hidden max-h-[500px] overflow-y-auto shadow-sm">
+                <h2 className="text-xl font-semibold mb-4">{t('currentStock')}</h2>
+                <div className="bg-white border rounded-lg overflow-hidden max-h-[445px] overflow-y-auto shadow-sm relative">
                     <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 z-10 border-b">
                             <tr>
-                                <th className="px-4 py-3">Plate #</th>
-                                <th className="px-4 py-3">Type</th>
-                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3 bg-gray-100">{t('plateNumber')}</th>
+                                <th className="px-4 py-3 bg-gray-100">{t('plateType')}</th>
+                                <th className="px-4 py-3 bg-gray-100">{t('initialStatus')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {plates.length > 0 ? plates.map((plate, idx) => (
                                 <tr key={idx} className="border-b hover:bg-gray-50">
                                     <td className="px-4 py-3 font-medium text-gray-900">{plate.plateNumber}</td>
-                                    <td className="px-4 py-3 capitalize text-gray-700">{plate.type}</td>
+                                    <td className="px-4 py-3 capitalize text-gray-700">{t(plate.type)}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded text-xs font-semibold 
                                             ${plate.status === 'available' ? 'bg-green-100 text-green-800' : 
                                               plate.status === 'assigned' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                                            {plate.status}
+                                            {t(plate.status)}
                                         </span>
                                     </td>
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan={3} className="px-4 py-4 text-center text-gray-500">No plates in inventory.</td>
+                                    <td colSpan={3} className="px-4 py-4 text-center text-gray-500">{t('noPlatesInventory')}</td>
                                 </tr>
                             )}
                         </tbody>

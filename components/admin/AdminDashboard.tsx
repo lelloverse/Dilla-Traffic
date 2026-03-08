@@ -3,12 +3,14 @@ import type { AdminView } from '../../App';
 import { FaUsers, FaFileAlt, FaCog, FaShieldAlt } from 'react-icons/fa';
 import { getPayments, getAuditLogs } from '../../database';
 import { Payment, AuditLog } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 interface AdminDashboardProps {
   onNavigate: (view: AdminView) => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
+  const { t } = useTranslation();
   const [weeklyData, setWeeklyData] = useState<{ day: string; amount: number; height: string }[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [activities, setActivities] = useState<AuditLog[]>([]);
@@ -82,10 +84,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     const diffInMs = now.getTime() - logDate.getTime();
     const diffInMins = Math.floor(diffInMs / 60000);
     
-    if (diffInMins < 1) return 'Just now';
-    if (diffInMins < 60) return `${diffInMins}m ago`;
+    if (diffInMins < 1) return t('justNow');
+    if (diffInMins < 60) return t('m_ago', { count: diffInMins });
     const diffInHours = Math.floor(diffInMins / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInHours < 24) return t('h_ago', { count: diffInHours });
     return logDate.toLocaleString('en-US', { 
         month: 'short', 
         day: 'numeric', 
@@ -99,28 +101,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
       <main className="p-4 md:p-8 space-y-8">
         
         <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Administrator Portal</h1>
-            <p className="text-gray-500 mt-2">Oversee system security, user access, and operational compliance.</p>
+            <h1 className="text-3xl font-bold text-gray-900">{t('adminPortal')}</h1>
+            <p className="text-gray-500 mt-2">{t('adminSubtitle')}</p>
         </div>
 
         {/* Quick Links */}
         <section>
-            <h2 className="text-xl font-semibold mb-4">Management Modules</h2>
+            <h2 className="text-xl font-semibold mb-4">{t('managementModules')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <button onClick={() => onNavigate('user-management')} className="flex flex-col items-center justify-center p-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition transform hover:-translate-y-1">
                     <FaUsers size={32} />
-                    <span className="text-lg font-bold mt-2">User Access</span>
-                    <span className="text-xs text-blue-200 mt-1">Manage accounts & roles</span>
+                    <span className="text-lg font-bold mt-2">{t('userAccess')}</span>
+                    <span className="text-xs text-blue-200 mt-1">{t('manageAccountsRoles')}</span>
                 </button>
                 <button onClick={() => onNavigate('audit-logs')} className="flex flex-col items-center justify-center p-6 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg transition transform hover:-translate-y-1">
                     <FaShieldAlt size={32} />
-                    <span className="text-lg font-bold mt-2">Audit Logs</span>
-                    <span className="text-xs text-red-200 mt-1">Security & Compliance</span>
+                    <span className="text-lg font-bold mt-2">{t('auditLogs')}</span>
+                    <span className="text-xs text-red-200 mt-1">{t('securityCompliance')}</span>
                 </button>
                  <button onClick={() => onNavigate('report-generator')} className="flex flex-col items-center justify-center p-6 bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-lg transition transform hover:-translate-y-1">
                     <FaFileAlt size={32} />
-                    <span className="text-lg font-bold mt-2">Reports</span>
-                    <span className="text-xs text-green-200 mt-1">Financial & Operational</span>
+                    <span className="text-lg font-bold mt-2">{t('reports')}</span>
+                    <span className="text-xs text-green-200 mt-1">{t('financialOperational')}</span>
                 </button>
             </div>
         </section>
@@ -129,7 +131,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
             {/* User Activity */}
             <div className="lg:col-span-2 space-y-8">
                 <section>
-                    <h2 className="text-xl font-semibold mb-4">Live System Activity</h2>
+                    <h2 className="text-xl font-semibold mb-4">{t('liveSystemActivity')}</h2>
                     <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-100">
                          <ul className="divide-y divide-gray-200">
                             {activities.length > 0 ? activities.map((activity, index) => (
@@ -148,11 +150,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                                     <span className="text-xs font-medium px-2 py-1 bg-gray-100 rounded text-gray-600">{formatTimeAgo(activity.timestamp)}</span>
                                 </li>
                             )) : (
-                                <li className="p-8 text-center text-gray-500 italic">No recent activity recorded.</li>
+                                <li className="p-8 text-center text-gray-500 italic">{t('noRecentActivity')}</li>
                             )}
                          </ul>
                          <div className="p-3 bg-gray-50 text-center">
-                             <button onClick={() => onNavigate('audit-logs')} className="text-sm text-blue-600 font-medium hover:underline">View Full Audit Trail</button>
+                             <button onClick={() => onNavigate('audit-logs')} className="text-sm text-blue-600 font-medium hover:underline">{t('viewFullAuditTrail')}</button>
                          </div>
                     </div>
                 </section>
@@ -160,14 +162,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
             {/* Revenue Reports */}
             <div className="space-y-8">
                 <section>
-                    <h2 className="text-xl font-semibold mb-4">Financial Overview</h2>
+                    <h2 className="text-xl font-semibold mb-4">{t('financialOverview')}</h2>
                     <div className="bg-white p-6 rounded-lg shadow border border-gray-100">
                         <div className="flex items-end justify-between mb-2">
                              <div>
-                                <p className="text-gray-500 text-sm">Weekly Revenue</p>
+                                <p className="text-gray-500 text-sm">{t('weeklyRevenue')}</p>
                                 <p className="font-bold text-3xl text-green-600">ETB {totalRevenue.toLocaleString()}</p>
                              </div>
-                             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">+12% vs last week</span>
+                             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">{t('vsLastWeek')}</span>
                         </div>
                         
                         <div className="mt-6 h-40 bg-gray-50 rounded-lg flex items-end justify-around p-4 border border-gray-100">
@@ -181,7 +183,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
                                </div>
                            ))}
                         </div>
-                        <button onClick={() => onNavigate('report-generator')} className="w-full mt-8 py-2 text-sm text-center text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition">Download Detailed Report</button>
+                        <button onClick={() => onNavigate('report-generator')} className="w-full mt-8 py-2 text-sm text-center text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition">{t('downloadDetailedReport')}</button>
                     </div>
                 </section>
             </div>

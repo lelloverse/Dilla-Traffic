@@ -74,7 +74,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
     await bulkMarkViolationsAsPaid(selectedIds);
     const updatedViolations = await getViolations();
     setViolations(updatedViolations);
-    addToast(`Successfully processed ${selectedIds.length} violations`, 'success');
+    addToast(t('bulkProcessSuccess', { count: selectedIds.length }), 'success');
     setSelectedIds([]);
   };
 
@@ -102,7 +102,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
     const updatedViolations = await getViolations();
     setViolations(updatedViolations);
 
-    addToast(`Violation ${v.id} has been reset to Unpaid status`, "info");
+    addToast(t('violationResetInfo', { id: v.id }), "info");
   };
 
   const handleProcessPayment = async () => {
@@ -141,7 +141,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
 
     const updatedViolations = await getViolations();
     setViolations(updatedViolations);
-    addToast(`Payment of ETB ${paymentAmount} recorded for ${selectedViolation.id}`, 'success');
+    addToast(t('paymentRecordedSuccess', { amount: paymentAmount, id: selectedViolation.id }), 'success');
     setShowPaymentModal(false);
     setSelectedViolation(null);
     setPaymentAmount(0);
@@ -152,13 +152,13 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b pb-4 border-gray-200">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Traffic Violations</h1>
-          <p className="text-gray-500 mt-1">Manage traffic violation records and track payments</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('trafficViolationsTitle')}</h1>
+          <p className="text-gray-500 mt-1">{t('manageViolationsDesc')}</p>
         </div>
         
         <div className="flex items-center space-x-4">
           <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100 text-center">
-            <p className="text-xs text-red-600 font-bold uppercase tracking-wider">Unpaid Total</p>
+            <p className="text-xs text-red-600 font-bold uppercase tracking-wider">{t('unpaidTotal')}</p>
             <p className="text-xl font-black text-red-900">
               ETB {violations.filter(v => v.status !== 'Paid').reduce((sum, v) => sum + (v.amount - v.amountPaid), 0).toLocaleString()}
             </p>
@@ -181,7 +181,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
             </span>
             <input 
               type="text"
-              placeholder="Search by ID, driver, license, plate..."
+              placeholder={t('searchViolationsPlaceholder')}
               className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -194,11 +194,11 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
-              <option value="all">All Statuses</option>
-              <option value="Paid">Paid</option>
-              <option value="Unpaid">Unpaid</option>
-              <option value="Partial">Partial</option>
-              <option value="Overdue">Overdue</option>
+              <option value="all">{t('allStatuses')}</option>
+              <option value="Paid">{t('paid')}</option>
+              <option value="Unpaid">{t('unpaid')}</option>
+              <option value="Partial">{t('partial')}</option>
+              <option value="Overdue">{t('overdue')}</option>
             </select>
           </div>
         </div>
@@ -206,13 +206,13 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
         {selectedIds.length > 0 && (
           <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in">
             <p className="text-sm text-blue-700 font-medium">
-              <span className="font-bold">{selectedIds.length}</span> violations selected
+              <span className="font-bold">{t('violationsSelected', { count: selectedIds.length })}</span>
             </p>
             <button 
               onClick={handleBulkPay}
               className="px-4 py-1.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition"
             >
-              Mark Selected as Paid
+              {t('markSelectedAsPaid')}
             </button>
           </div>
         )}
@@ -232,11 +232,11 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
                     checked={selectedIds.length === filteredViolations.length && filteredViolations.length > 0}
                   />
                 </th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Violation & Date</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Driver / Vehicle</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('violationAndDate')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('driverVehicle')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('amount')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('status')}</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -281,7 +281,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusStyle(v.status)}`}>
-                        {v.status}
+                        {t(v.status.toLowerCase())}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -294,14 +294,14 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
                               setShowPaymentModal(true);
                             }}
                             className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
-                            title="Record Payment"
+                            title={t('recordPayment')}
                           >
                             <FaCreditCard size={14} />
                           </button>
                         )}
                         <button 
                           className={`p-2 rounded-lg transition-colors ${v.status === 'Unpaid' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 text-orange-600 hover:bg-orange-600 hover:text-white'}`}
-                          title="Undo Payment"
+                          title={t('undoPayment')}
                           disabled={v.status === 'Unpaid'}
                           onClick={() => handleUndoPayment(v)}
                         >
@@ -314,7 +314,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
               ) : (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500 italic">
-                    No violations found.
+                    {t('noViolationsFound')}
                   </td>
                 </tr>
               )}
@@ -328,7 +328,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Record Payment</h3>
+              <h3 className="text-xl font-bold text-gray-900">{t('recordPayment')}</h3>
               <button 
                 onClick={() => setShowPaymentModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -339,22 +339,22 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
 
             <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Violation ID</span>
+                <span className="text-sm text-gray-500">{t('violationId')}</span>
                 <span className="text-sm font-mono font-bold">{selectedViolation.id}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-500">Total Amount</span>
+                <span className="text-sm text-gray-500">{t('totalAmount')}</span>
                 <span className="text-sm font-bold">ETB {selectedViolation.amount}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Remaining</span>
+                <span className="text-sm text-gray-500">{t('remaining')}</span>
                 <span className="text-sm font-bold text-red-600">ETB {selectedViolation.amount - selectedViolation.amountPaid}</span>
               </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Payment Amount (ETB)</label>
+                <label className="block text-sm font-medium mb-1">{t('amountEtb')}</label>
                 <input 
                   type="number"
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -364,23 +364,23 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Payment Method</label>
+                <label className="block text-sm font-medium mb-1">{t('paymentMethod')}</label>
                 <select 
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 >
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Card</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="Mobile Money">Mobile Money (Telebirr)</option>
+                  <option value="Cash">{t('cash')}</option>
+                  <option value="Card">{t('card')}</option>
+                  <option value="Bank Transfer">{t('bankTransfer')}</option>
+                  <option value="Mobile Money">{t('mobileMoney')}</option>
                 </select>
               </div>
               <button 
                 onClick={handleProcessPayment}
                 className="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition"
               >
-                Confirm Payment
+                {t('confirmPayment')}
               </button>
             </div>
           </div>

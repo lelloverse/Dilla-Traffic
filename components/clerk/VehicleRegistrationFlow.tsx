@@ -2,19 +2,22 @@ import React, { useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { updateVehicle, addAuditLog } from '../../database';
 import { Vehicle } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 interface VehicleRegistrationFlowProps {
   onBack: () => void;
 }
 
-const steps = [
-  "Owner Information",
-  "Vehicle Specifications",
-  "Review & Submit"
-];
-
 const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBack }) => {
+  const { t } = useTranslation();
   const { addToast } = useToast();
+
+  const steps = [
+    t('ownerInformation'),
+    t('vehicleSpecifications'),
+    t('reviewSubmit')
+  ];
+
   const [currentStep, setCurrentStep] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [formData, setFormData] = useState({
@@ -44,43 +47,40 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
 
       switch(name) {
           case 'ownerName':
-              if (!value.trim()) error = 'Owner name is required';
+              if (!value.trim()) error = t('ownerName') + ' is required';
               break;
           case 'phone':
-              if (!value.trim()) error = 'Phone number is required';
+              if (!value.trim()) error = t('phoneNumber') + ' is required';
               else if (!/^[\d\+\-\s]{10,}$/.test(value)) error = 'Invalid phone format';
               break;
-          case 'email':
-              if (value && !/\S+@\S+\.\S+/.test(value)) error = 'Invalid email address';
-              break;
           case 'address':
-              if (!value.trim()) error = 'Address is required';
+              if (!value.trim()) error = t('address') + ' is required';
               break;
           case 'nationalId':
-              if (!value.trim()) error = 'National ID is required';
+              if (!value.trim()) error = t('nationalId') + ' is required';
               break;
           case 'plateNumber':
-              if (!value.trim()) error = 'Plate number is required';
+              if (!value.trim()) error = t('plateRegistration') + ' is required';
               else if (!/^[A-Z0-9\-\s]{3,15}$/i.test(value)) error = 'Invalid plate number format';
               break;
           case 'make':
-              if (!value.trim()) error = 'Make is required';
+              if (!value.trim()) error = t('make') + ' is required';
               break;
           case 'model':
-              if (!value.trim()) error = 'Model is required';
+              if (!value.trim()) error = t('model') + ' is required';
               break;
           case 'color':
-              if (!value.trim()) error = 'Color is required';
+              if (!value.trim()) error = t('color') + ' is required';
               break;
           case 'year':
-              if (!value) error = 'Year is required';
+              if (!value) error = t('year') + ' is required';
               else if (parseInt(value) < 1900 || parseInt(value) > currentYear + 1) error = `Year must be between 1900 and ${currentYear + 1}`;
               break;
           case 'chassisNumber':
-              if (!value.trim()) error = 'Chassis number is required';
+              if (!value.trim()) error = t('chassisNumber') + ' is required';
               break;
           case 'engineNumber':
-              if (!value.trim()) error = 'Engine number is required';
+              if (!value.trim()) error = t('engineNumber') + ' is required';
               break;
       }
       return error;
@@ -171,7 +171,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
           status: 'success'
       });
 
-      addToast("Vehicle Registration Submitted Successfully!", "success");
+      addToast(t('registrationSuccess'), "success");
       onBack();
   };
 
@@ -193,10 +193,10 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
       switch(currentStep) {
           case 1: return (
               <div className="space-y-4">
-                  <h3 className="text-lg font-medium mb-4 border-b pb-2">Owner's Information</h3>
+                  <h3 className="text-lg font-medium mb-4 border-b pb-2">{t('ownerInformation')}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                          <label className="block text-sm font-medium mb-1">Owner Name <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('ownerName')} <span className="text-red-500">*</span></label>
                           <input 
                             name="ownerName" 
                             value={formData.ownerName} 
@@ -208,7 +208,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('ownerName')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Phone Number <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('phoneNumber')} <span className="text-red-500">*</span></label>
                           <input 
                             name="phone" 
                             value={formData.phone} 
@@ -220,7 +220,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('phone')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Address <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('address')} <span className="text-red-500">*</span></label>
                           <input 
                             name="address" 
                             value={formData.address} 
@@ -232,7 +232,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('address')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">National ID <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('nationalId')} <span className="text-red-500">*</span></label>
                           <input 
                             name="nationalId" 
                             value={formData.nationalId} 
@@ -248,10 +248,10 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
           );
           case 2: return (
               <div className="space-y-4">
-                  <h3 className="text-lg font-medium mb-4 border-b pb-2">Vehicle Specifications</h3>
+                  <h3 className="text-lg font-medium mb-4 border-b pb-2">{t('vehicleSpecifications')}</h3>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                          <label className="block text-sm font-medium mb-1">Plate Registration <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('plateRegistration')} <span className="text-red-500">*</span></label>
                           <input 
                             name="plateNumber" 
                             value={formData.plateNumber} 
@@ -263,17 +263,17 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('plateNumber')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Vehicle Type</label>
+                          <label className="block text-sm font-medium mb-1">{t('vehicleType')}</label>
                           <select name="type" value={formData.type} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50 border-gray-300">
-                              <option value="private">Private</option>
-                              <option value="commercial">Commercial</option>
-                              <option value="motorcycle">Motorcycle</option>
-                              <option value="truck">Truck</option>
-                              <option value="bus">Bus</option>
+                              <option value="private">{t('private')}</option>
+                              <option value="commercial">{t('commercial')}</option>
+                              <option value="motorcycle">{t('motorcycle')}</option>
+                              <option value="truck">{t('truck')}</option>
+                              <option value="bus">{t('bus')}</option>
                           </select>
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Make <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('make')} <span className="text-red-500">*</span></label>
                           <input 
                             name="make" 
                             value={formData.make} 
@@ -285,7 +285,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('make')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Model <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('model')} <span className="text-red-500">*</span></label>
                           <input 
                             name="model" 
                             value={formData.model} 
@@ -297,7 +297,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('model')}
                       </div>
                        <div>
-                          <label className="block text-sm font-medium mb-1">Year <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('year')} <span className="text-red-500">*</span></label>
                           <input 
                             name="year" 
                             type="number" 
@@ -310,7 +310,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('year')}
                       </div>
                        <div>
-                          <label className="block text-sm font-medium mb-1">Chassis Number <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('chassisNumber')} <span className="text-red-500">*</span></label>
                           <input 
                             name="chassisNumber" 
                             value={formData.chassisNumber} 
@@ -321,7 +321,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('chassisNumber')}
                       </div>
                        <div>
-                          <label className="block text-sm font-medium mb-1">Engine Number <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('engineNumber')} <span className="text-red-500">*</span></label>
                           <input 
                             name="engineNumber" 
                             value={formData.engineNumber} 
@@ -332,7 +332,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('engineNumber')}
                       </div>
                       <div>
-                          <label className="block text-sm font-medium mb-1">Color <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-medium mb-1">{t('color')} <span className="text-red-500">*</span></label>
                           <input 
                             name="color" 
                             value={formData.color} 
@@ -344,12 +344,12 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                           {renderError('color')}
                       </div>
                        <div>
-                          <label className="block text-sm font-medium mb-1">Fuel Type</label>
+                          <label className="block text-sm font-medium mb-1">{t('fuelType')}</label>
                           <select name="fuelType" value={formData.fuelType} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50 border-gray-300">
-                              <option value="petrol">Petrol</option>
-                              <option value="diesel">Diesel</option>
-                              <option value="electric">Electric</option>
-                              <option value="hybrid">Hybrid</option>
+                              <option value="petrol">{t('petrol')}</option>
+                              <option value="diesel">{t('diesel')}</option>
+                              <option value="electric">{t('electric')}</option>
+                              <option value="hybrid">{t('hybrid')}</option>
                           </select>
                       </div>
                   </div>
@@ -358,20 +358,20 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
           case 3: return (
               <div className="space-y-6">
                  <div className="text-center">
-                     <h3 className="text-2xl font-bold text-gray-800 mb-2">Review Details</h3>
-                     <p className="text-gray-500">Please confirm the information below before submitting.</p>
+                     <h3 className="text-2xl font-bold text-gray-800 mb-2">{t('reviewDetails')}</h3>
+                     <p className="text-gray-500">{t('confirmInformation')}</p>
                  </div>
                  <div className="bg-gray-50 p-4 rounded-lg">
-                     <h4 className="font-bold border-b pb-1 mb-2">Owner</h4>
+                     <h4 className="font-bold border-b pb-1 mb-2">{t('ownerInformation')}</h4>
                      <p>{formData.ownerName} ({formData.phone})</p>
-                     <p className="text-sm text-gray-700">National ID: {formData.nationalId}</p>
+                     <p className="text-sm text-gray-700">{t('nationalId')}: {formData.nationalId}</p>
                      <p className="text-sm text-gray-500">{formData.address}</p>
                  </div>
                  <div className="bg-gray-50 p-4 rounded-lg">
-                     <h4 className="font-bold border-b pb-1 mb-2">Vehicle</h4>
-                     <p>{formData.year} {formData.make} {formData.model} ({formData.type})</p>
-                     <p>Plate: <span className="font-semibold">{formData.plateNumber}</span> | Color: <span className="font-semibold">{formData.color}</span></p>
-                     <p className="text-sm text-gray-500">Chassis: {formData.chassisNumber} | Engine: {formData.engineNumber}</p>
+                     <h4 className="font-bold border-b pb-1 mb-2">{t('vehicleSpecifications')}</h4>
+                     <p>{formData.year} {formData.make} {formData.model} ({t(formData.type)})</p>
+                     <p>{t('plateRegistration')}: <span className="font-semibold">{formData.plateNumber}</span> | {t('color')}: <span className="font-semibold">{formData.color}</span></p>
+                     <p className="text-sm text-gray-500">{t('chassisNumber')}: {formData.chassisNumber} | {t('engineNumber')}: {formData.engineNumber}</p>
                  </div>
               </div>
            );
@@ -382,8 +382,8 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-xl p-8 border border-gray-100">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">New Vehicle Registration</h1>
-        <p className="text-gray-500 mb-6">{`Step ${currentStep} of ${steps.length}: ${steps[currentStep-1]}`}</p>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">{t('newVehicleRegistration')}</h1>
+        <p className="text-gray-500 mb-6">{t('stepOutOf', { current: currentStep, total: steps.length, step: steps[currentStep-1] })}</p>
 
         {/* Progress Bar */}
         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-8">
@@ -399,7 +399,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
             onClick={onBack}
             className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <div className="flex gap-4">
             {currentStep > 1 && (
@@ -407,7 +407,7 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                 onClick={handlePrev}
                 className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
               >
-                Previous
+                {t('previous')}
               </button>
             )}
              {currentStep < steps.length ? (
@@ -415,14 +415,14 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                 onClick={handleNext}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
-                Next
+                {t('next')}
               </button>
             ) : (
                 <button
                 onClick={handleSubmitClick}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                 >
-                Submit Registration
+                {t('submitRegistration')}
                 </button>
             )}
           </div>
@@ -433,17 +433,17 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
       {showConfirmation && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 animate-fade-in">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Submission</h3>
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">{t('confirmSubmission')}</h3>
                   <p className="text-gray-600 mb-6">
-                      Are you sure you want to register this vehicle? Please verify the details below one last time.
+                      {t('confirmVehicleRegText')}
                   </p>
                   
                   <div className="bg-gray-50 p-4 rounded-lg mb-6 text-sm space-y-2">
-                      <p><span className="font-semibold">Owner:</span> {formData.ownerName} ({formData.nationalId})</p>
-                      <p><span className="font-semibold">Plate:</span> {formData.plateNumber} | <span className="font-semibold">Color:</span> {formData.color}</p>
-                      <p><span className="font-semibold">Vehicle:</span> {formData.year} {formData.make} {formData.model}</p>
-                      <p><span className="font-semibold">Chassis:</span> {formData.chassisNumber}</p>
-                      <p><span className="font-semibold">Engine:</span> {formData.engineNumber}</p>
+                      <p><span className="font-semibold">{t('ownerName')}:</span> {formData.ownerName} ({formData.nationalId})</p>
+                      <p><span className="font-semibold">{t('plateRegistration')}:</span> {formData.plateNumber} | <span className="font-semibold">{t('color')}:</span> {formData.color}</p>
+                      <p><span className="font-semibold">{t('vehicleSpecifications')}:</span> {formData.year} {formData.make} {formData.model}</p>
+                      <p><span className="font-semibold">{t('chassisNumber')}:</span> {formData.chassisNumber}</p>
+                      <p><span className="font-semibold">{t('engineNumber')}:</span> {formData.engineNumber}</p>
                   </div>
 
                   <div className="flex justify-end gap-3">
@@ -451,13 +451,13 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
                         onClick={() => setShowConfirmation(false)}
                         className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
                       >
-                          Edit Details
+                          {t('editDetails')}
                       </button>
                       <button 
                         onClick={confirmSubmit}
                         className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
                       >
-                          Confirm & Submit
+                          {t('confirmAndSubmit')}
                       </button>
                   </div>
               </div>

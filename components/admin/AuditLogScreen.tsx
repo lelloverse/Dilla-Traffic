@@ -2,20 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { FaShieldAlt, FaSearch, FaDownload } from 'react-icons/fa';
 import { getAuditLogs } from '../../database';
 import { AuditLog } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 interface AuditLogScreenProps {
   onBack: () => void;
 }
 
 const AuditLogScreen: React.FC<AuditLogScreenProps> = ({ onBack }) => {
+    const { t } = useTranslation();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState('All');
     const [logs, setLogs] = useState<AuditLog[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchLogs = async () => {
             const data = await getAuditLogs();
-            setLogs(data);
+            setLogs(data.reverse()); // Newest first
+            setIsLoading(false);
         };
         fetchLogs();
     }, []);
@@ -46,102 +50,137 @@ const AuditLogScreen: React.FC<AuditLogScreenProps> = ({ onBack }) => {
         return matchesSearch && matchesRole;
     });
 
-  return (
-    <div className="p-4 md:p-8">
-      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-xl p-8 border border-gray-100">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-            <div>
-                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                    <FaShieldAlt size={32} color="#dc2626" />
-                    Audit Logs
-                </h1>
-                <p className="text-gray-500">Track and monitor all system activities for compliance and security.</p>
-            </div>
-            <button
-                onClick={onBack}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
-            >
-                Back to Dashboard
-            </button>
-        </div>
+    const handleExport = () => {
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + ["Timestamp,User,Role,Action,Details,IP,Status"].join(",") + "\n"
+          + filteredLogs.map(log => [
+              log.timestamp,
+              log.user,
+              log.role,
+              log.action,
+              `"${log.details}"`,
+              log.ipAddress,
+              log.status
+            ].join(",")).join("\n");
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `audit_log_${new Date().toISOString()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
-        {/* Filters */}
-        <div className="bg-gray-50 p-4 rounded-lg mb-6 flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-                <label className="block text-sm font-medium mb-1 text-gray-700">Search Logs</label>
-                <div className="relative">
-                    <input 
-                        type="text" 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search by user, action, or details..." 
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg bg-white"
-                    />
-                    <div className="text-gray-400 absolute left-3 top-2.5">
-                        <FaSearch size={20} />
-                    </div>
-                </div>
+  return (
+    <div className="p-4 md:p-8 animate-fade-in">
+      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-xl p-8 border border-gray-100">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-6">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                    <FaShieldAlt size={32} color="#dc2626" />
+                    {t('auditLogsTitle')}
+                </h1>
+                <p className="text-gray-500 mt-1">{t('auditLogsSubtitle')}</p>
             </div>
-            <div className="w-full md:w-48">
-                <label className="block text-sm font-medium mb-1 text-gray-700">Filter by Role</label>
-                <select 
-                    value={filterRole} 
-                    onChange={(e) => setFilterRole(e.target.value)}
-                    className="w-full p-2 border rounded-lg bg-white"
+            <div className="flex gap-3">
+                <button 
+                    onClick={handleExport}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
                 >
-                    <option value="All">All Roles</option>
-                    <option value="Admin">Admin</option>
-                    <option value="Clerk">Clerk</option>
-                    <option value="Officer">Officer</option>
-                </select>
-            </div>
-            <div className="w-full md:w-auto flex items-end">
-                <button className="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                    <FaDownload size={16} />
-                    Export Log
+                    <FaDownload size={14} /> {t('exportLog')}
+                </button>
+                <button
+                    onClick={onBack}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
+                >
+                    {t('backToDashboard')}
                 </button>
             </div>
         </div>
 
+        {/* Filters */}
+        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <FaSearch size={14} />
+                </span>
+                <input 
+                    type="text" 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={t('searchLogsPlaceholder')} 
+                    className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                />
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+                <select 
+                    value={filterRole} 
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="flex-1 md:w-48 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                    <option value="All">{t('allRoles')}</option>
+                    <option value="Admin">{t('admin')}</option>
+                    <option value="Clerk">{t('clerk')}</option>
+                    <option value="Officer">{t('officer')}</option>
+                </select>
+            </div>
+        </div>
+
         {/* Logs Table */}
-        <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full text-sm text-left text-gray-500">
-                <thead className="text-xs text-gray-700 uppercase bg-gray-100">
-                    <tr>
-                        <th scope="col" className="px-6 py-3">Timestamp</th>
-                        <th scope="col" className="px-6 py-3">User</th>
-                        <th scope="col" className="px-6 py-3">Action</th>
-                        <th scope="col" className="px-6 py-3">Details</th>
-                        <th scope="col" className="px-6 py-3">IP Address</th>
-                        <th scope="col" className="px-6 py-3">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredLogs.length > 0 ? filteredLogs.map(log => (
-                        <tr key={log.id} className="bg-white border-b hover:bg-gray-50 transition">
-                            <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-gray-700 font-semibold">{formatTimestamp(log.timestamp)}</td>
-                            <td className="px-6 py-4">
-                                <div className="font-medium text-gray-900">{log.user}</div>
-                                <div className="text-xs">{log.role}</div>
-                            </td>
-                            <td className="px-6 py-4 font-semibold text-gray-800">{log.action}</td>
-                            <td className="px-6 py-4 max-w-xs truncate" title={log.details}>{log.details}</td>
-                            <td className="px-6 py-4 font-mono text-xs">{log.ipAddress}</td>
-                            <td className="px-6 py-4">
-                                {log.status === 'success' ? (
-                                    <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Success</span>
-                                ) : (
-                                    <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded">Failure</span>
-                                )}
-                            </td>
-                        </tr>
-                    )) : (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
-                            <td colSpan={6} className="px-6 py-8 text-center italic">No logs found matching your criteria.</td>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('timestamp')}</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('user')}</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('action')}</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('ipAddress')}</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('status')}</th>
                         </tr>
-                    )}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {isLoading ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-12 text-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                            </td>
+                          </tr>
+                        ) : filteredLogs.length > 0 ? filteredLogs.map((log, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{formatTimestamp(log.timestamp)}</td>
+                                <td className="px-6 py-4">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-gray-900">{log.user}</span>
+                                        <span className="text-xs text-gray-500 uppercase">{t(log.role.toLowerCase())}</span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-800">{log.action}</span>
+                                        <span className="text-xs text-gray-500 italic">{log.details}</span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-mono text-gray-500">{log.ipAddress}</td>
+                                <td className="px-6 py-4">
+                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold border uppercase ${
+                                      log.status === 'success' 
+                                        ? 'bg-green-50 text-green-700 border-green-100' 
+                                        : 'bg-red-50 text-red-700 border-red-100'
+                                    }`}>
+                                      {t(log.status)}
+                                    </span>
+                                </td>
+                            </tr>
+                        )) : (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">{t('noLogsFound')}</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
       </div>
     </div>

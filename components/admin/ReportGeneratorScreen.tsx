@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { FaFileCsv, FaFilePdf } from 'react-icons/fa';
 import { getPayments, getVehicles, getDrivers } from '../../database';
+import { useTranslation } from 'react-i18next';
 
 interface ReportGeneratorScreenProps {
   onBack: () => void;
@@ -10,6 +11,7 @@ interface ReportGeneratorScreenProps {
 type ReportType = 'none' | 'revenue' | 'registrations' | 'licenses';
 
 const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack }) => {
+    const { t } = useTranslation();
     const { addToast } = useToast();
     const [reportType, setReportType] = useState<ReportType>('none');
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -18,6 +20,7 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack })
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (reportType === 'none') {
+            addToast(t('allFieldsRequired'), "error");
             setGeneratedReport(null);
             return;
         };
@@ -86,11 +89,11 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack })
         }
 
         if (data.length === 0) {
-            addToast("No data found for the selected criteria", "info");
+            addToast(t('noDataFound'), "info");
             setGeneratedReport([]);
         } else {
             setGeneratedReport(data);
-            addToast(`Report generated with ${data.length} records`, "success");
+            addToast(t('reportGeneratedRecords', { count: data.length }), "success");
         }
     }
 
@@ -113,7 +116,7 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack })
         link.click();
         document.body.removeChild(link);
         
-        addToast("Report exported as CSV", "success");
+        addToast(t('reportExportedCsv'), "success");
     };
 
     const handleExportPDF = () => {
@@ -122,7 +125,7 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack })
     };
     
     const renderReportTable = () => {
-        if (!generatedReport) return <p className="text-gray-500">No report generated.</p>;
+        if (!generatedReport) return <p className="text-gray-500">{t('noReportGenerated')}</p>;
         
         const headers = Object.keys(generatedReport[0] || {});
 
@@ -150,51 +153,51 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack })
     <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-xl p-8 border border-gray-100">
         <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">Report Generator</h1>
+            <h1 className="text-2xl font-bold text-gray-800">{t('reportGenerator')}</h1>
             <button
                 onClick={onBack}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
             >
-                Back to Dashboard
+                {t('backToDashboard')}
             </button>
         </div>
 
         {/* Report Builder Form */}
         <form onSubmit={handleGenerate} className="p-6 bg-gray-50 rounded-lg md:flex items-end gap-4 space-y-4 md:space-y-0">
             <div className="flex-grow">
-                <label htmlFor="reportType" className="block text-sm font-medium">Report Type</label>
+                <label htmlFor="reportType" className="block text-sm font-medium">{t('reportType')}</label>
                 <select id="reportType" value={reportType} onChange={e => setReportType(e.target.value as ReportType)} className="w-full p-2 mt-1 border rounded bg-white border-gray-300">
-                    <option value="none">Select a report...</option>
-                    <option value="revenue">Revenue</option>
-                    <option value="registrations">Vehicle Registrations</option>
-                    <option value="licenses">Licenses Issued</option>
+                    <option value="none">{t('selectReport')}</option>
+                    <option value="revenue">{t('revenue')}</option>
+                    <option value="registrations">{t('vehicleRegistrations')}</option>
+                    <option value="licenses">{t('licensesIssued')}</option>
                 </select>
             </div>
              <div className="flex-grow">
-                <label htmlFor="startDate" className="block text-sm font-medium">Start Date</label>
+                <label htmlFor="startDate" className="block text-sm font-medium">{t('startDate')}</label>
                 <input type="date" id="startDate" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="w-full p-2 mt-1 border rounded bg-white border-gray-300" />
             </div>
              <div className="flex-grow">
-                <label htmlFor="endDate" className="block text-sm font-medium">End Date</label>
+                <label htmlFor="endDate" className="block text-sm font-medium">{t('endDate')}</label>
                 <input type="date" id="endDate" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="w-full p-2 mt-1 border rounded bg-white border-gray-300" />
             </div>
-            <button type="submit" className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Generate Report</button>
+            <button type="submit" className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">{t('generateReport')}</button>
         </form>
 
         {/* Generated Report */}
         <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Generated Report</h2>
+                <h2 className="text-xl font-semibold">{t('generatedReport')}</h2>
                 {generatedReport && (
                     <div className="flex gap-2">
-                        <button onClick={() => window.print()} className="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300 transition">Print</button>
+                        <button onClick={() => window.print()} className="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300 transition">{t('print')}</button>
                         <button onClick={handleExportCSV} className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-1">
                             <FaFileCsv size={16} />
-                            CSV
+                            {t('csv')}
                         </button>
                         <button onClick={handleExportPDF} className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center gap-1">
                              <FaFilePdf size={16} />
-                            PDF
+                            {t('pdf')}
                         </button>
                     </div>
                 )}
