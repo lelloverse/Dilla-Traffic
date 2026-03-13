@@ -285,17 +285,14 @@ export const getAuditLogs = async (): Promise<any[]> => {
 };
 
 export const addAuditLog = async (log: any): Promise<void> => {
-    const { error } = await supabase
-        .from('audit_logs')
-        .insert({
-            id: uuidv4(),
-            user: log.user,
-            role: log.role,
-            action: log.action,
-            details: log.details,
-            ip_address: log.ipAddress,
-            status: log.status
-        });
+    const { error } = await supabase.rpc('insert_audit_log', {
+        p_user: log.user,
+        p_role: log.role,
+        p_action: log.action,
+        p_details: log.details,
+        p_ip_address: log.ipAddress,
+        p_status: log.status
+    });
     if (error) throw error;
 };
 
