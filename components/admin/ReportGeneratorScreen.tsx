@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { FaFileCsv, FaFilePdf } from 'react-icons/fa';
+
 import { getPayments, getVehicles, getDrivers } from '../../database';
 import { User, UserRole } from '../../types';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +35,7 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack, c
             case 'revenue':
                 const payments = await getPayments();
                 data = payments.map(p => ({
-                    date: p.date,
+                    date: p.date.split('T')[0],
                     amount: `ETB ${p.amount.toLocaleString()}`,
                     type: p.serviceType.replace('_', ' ').toUpperCase(),
                     payer: p.payerName,
@@ -44,7 +45,7 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack, c
             case 'registrations':
                 const vehicles = await getVehicles();
                 data = vehicles.map(v => ({
-                    date: (v as any).createdAt || v.expiryDate, // Use createdAt if available
+                    date: ((v as any).createdAt || v.expiryDate).split('T')[0], // Clean date, remove time
                     plate: v.plateNumber,
                     vehicle: `${v.make} ${v.model}`,
                     owner: v.ownerName,
@@ -55,7 +56,7 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack, c
             case 'licenses':
                 const drivers = await getDrivers();
                 data = drivers.map(d => ({
-                    date: (d as any).createdAt || d.expiryDate, // Use createdAt if available
+                    date: ((d as any).createdAt || d.expiryDate).split('T')[0], // Clean date, remove time
                     licenseNo: d.licenseNumber,
                     name: d.fullName,
                     status: d.status,
@@ -121,9 +122,60 @@ const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack, c
         addToast(t('reportExportedCsv'), "success");
     };
 
-    const handleExportPDF = () => {
-        window.print();
-        addToast("Print dialog opened for PDF export", "info");
+    const handleExportPDF = async () => {
+        if (!generatedReport || generatedReport.length === 0) {
+            addToast(t('noReportGenerated'), "error");
+            return;
+        }
+        
+        const jsPDF = (await import('jspdf')).default;
+        const doc = new jsPDF();
+        
+        // Title
+        const today = new Date().toISOString().split('T')[0];
+        const dateStr = (dateRange.start || dateRange.end ? `${dateRange.start} to ${dateRange.end}`.trim() : today).replace(/[^a-z0-9]/gi, '_');
+        doc.setFontSize(18);
+        doc.text(`${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report - ${dateRange.start || dateRange.end ? dateRange.start + ' to ' + dateRange.end : today}`, 20, 25);
+        
+        if (generatedReport.length === 0) {
+            doc.setFontSize(12);
+            doc.text('No data found for the selected criteria.', 20, 50);
+            doc.save(`no_data_${reportType}_${dateStr}.pdf`);
+            addToast('PDF exported (no data)', "info");
+            return;
+        }
+        
+        // Headers
+        const headers = Object.keys(generatedReport[0]);
+        let yPos = 45;
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        const headerWidth = Math.min(35, 170 / headers.length);
+        doc.text('Headers:', 20, yPos);
+        yPos += 8;
+        headers.forEach((header, index) => {
+            doc.text(`${header}:`, 20 + (index * 40), yPos);
+        });
+        yPos += 15;
+        
+        // Data rows
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        generatedReport.forEach((row, rowIndex) => {
+            if (rowIndex > 0 && rowIndex % 25 === 0) { // New page every 25 rows
+                doc.addPage();
+                yPos = 25;
+            }
+            headers.forEach((header, colIndex) => {
+                const cellText = String(row[header] || '').substring(0, 25); // Truncate long text
+                doc.text(cellText, 20 + (colIndex * 40), yPos);
+            });
+            yPos += 10;
+        });
+        
+        const filename = `${reportType}_report_${dateStr}.pdf`;
+        doc.save(filename);
+        addToast("PDF report exported successfully", "success");
     };
     
     const renderReportTable = () => {

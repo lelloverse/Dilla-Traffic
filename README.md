@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Licensing System
 
-# Run and deploy your AI Studio app
+## Setup Instructions
 
-This contains everything you need to run your app locally.
+1. **Supabase Configuration**
+   - Create Supabase project
+   - Run `jwt.sql` and `query.sql` in SQL Editor
+   - Copy keys to `.env`:
 
-View your app in AI Studio: https://ai.studio/apps/570f14f4-11fa-4abc-a860-8efd101e5c1d
+```
+VITE_SUPABASE_URL=your_project_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
 
-## Run Locally
+2. **Install Dependencies**
+   ```
+   npm install
+   ```
 
-**Prerequisites:**  Node.js
+3. **Development**
+   ```
+   npm run dev
+   ```
 
+## Features
+- User Management (Admin password reset)
+- Vehicle/Driver Registry
+- Violations & Payments
+- Woreda-based RLS
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Password Reset (Admin)
+- Go to User Management
+- Edit user → Reset Password field
+- Uses service role to update Supabase Auth + custom table

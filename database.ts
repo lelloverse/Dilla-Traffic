@@ -1,7 +1,8 @@
 // database.ts
-import { supabase } from './supabaseClient';
+import { supabase, supabaseAdmin } from './supabaseClient';
 import { Vehicle, Driver, Violation, User, SearchResult, Alert, PlateItem, Payment, AuditLog, Woreda } from './types';
 import { v4 as uuidv4 } from 'uuid';
+
 
 // --- Mapping Helpers ---
 
@@ -258,6 +259,20 @@ export const updateUser = async (user: User): Promise<void> => {
     if (error) throw error;
 };
 
+// Add or update this in database.ts
+export const getUserProfile = async (identifier: string) => {
+    const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        // Allow login by either username OR email
+        .or(`username.eq.${identifier},email.eq.${identifier}`)
+        .maybeSingle();
+    
+    if (error) throw error;
+    return mapToCamel(data) as User;
+};
+
+
 // --- Plates API ---
 export const getPlates = async (): Promise<PlateItem[]> => {
     const { data, error } = await supabase
@@ -279,6 +294,24 @@ export const addPlate = async (plate: PlateItem): Promise<void> => {
     if (error) throw error;
 };
 
+// --- Helper: Get current user's woreda_id ---
+export const getCurrentUserWoreda = async (): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No authenticated user');
+    
+    const { data, error } = await supabase
+        .from('users')
+        .select('woreda_id')
+        .eq('id', user.id)
+        .single();
+    
+    if (error || !data?.woreda_id) {
+        throw new Error('User woreda_id not found');
+    }
+    
+    return data.woreda_id;
+};
+
 // --- Payments API ---
 export const getPayments = async (): Promise<Payment[]> => {
     const { data, error } = await supabase
@@ -289,11 +322,13 @@ export const getPayments = async (): Promise<Payment[]> => {
 };
 
 export const addPayment = async (payment: Payment): Promise<void> => {
+    const woredaId = await getCurrentUserWoreda();
     const p = payment as any;
     const { error } = await supabase
         .from('payments')
         .insert({
             id: p.id || uuidv4(),
+            woreda_id: woredaId,
             payer_name: p.payerName,
             service_type: p.serviceType,
             amount: p.amount,
@@ -397,10 +432,12 @@ export const getAlerts = async (): Promise<Alert[]> => {
 };
 
 export const addAlert = async (alert: Omit<Alert, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
+    const woredaId = await getCurrentUserWoreda();
     const { error } = await supabase
         .from('alerts')
         .insert({
             id: uuidv4(),
+            woreda_id: woredaId,
             category: alert.category,
             type: alert.type,
             title: alert.title,
@@ -431,4 +468,28 @@ export const updateAlert = async (id: string, updates: Partial<Alert>): Promise<
         .update(payload)
         .eq('id', id);
     if (error) throw error;
+};
+
+// --- Password Reset API ---
+export const resetPasswordForUser = async (userId: string, newPassword: string): Promise<void> => {
+    try {
+        // Update Supabase Auth password (service role)
+        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+            userId,
+            { password: newPassword }
+        );
+        if (authError) throw authError;
+
+        // Update custom users table password for consistency
+        const { error: dbError } = await supabase
+            .from('users')
+            .update({ password: newPassword })
+            .eq('id', userId);
+        if (dbError) throw dbError;
+
+        console.log(`Password reset successful for user ${userId}`);
+    } catch (error: any) {
+        console.error('Password reset failed:', error);
+        throw new Error(`Failed to reset password: ${error.message}`);
+    }
 };

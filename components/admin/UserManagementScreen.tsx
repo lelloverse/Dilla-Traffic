@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserRole, User } from '../../types';
-import { getUsers, updateUser, addUser, addAuditLog, getWoredas } from '../../database';
+import { getUsers, updateUser, addUser, addAuditLog, getWoredas, resetPasswordForUser } from '../../database';
 import { useToast } from '../../context/ToastContext';
 import { FaUserPlus, FaShieldAlt } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
 import { useTranslation } from 'react-i18next';
+
 
 interface UserManagementScreenProps {
   onBack: () => void;
@@ -196,17 +197,14 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
 
         setIsLoading(true); // Show loading state
         try {
-            // Update in public.users table
-            await updateUser({
-                ...selectedUser,
-                password: resetPasswordValue
-            });
+            // Use new reset function (updates both auth.users & public.users)
+            await resetPasswordForUser(selectedUser.id, resetPasswordValue);
             
             await addAuditLog({
                 action: 'PASSWORD_RESET',
-                user: 'Admin',
-                role: 'Admin',
-                details: `Updated password for user ${selectedUser.username}`,
+                user: currentUser?.username || 'Admin',
+                role: currentUser?.role || 'Admin',
+                details: `Reset password for user ${selectedUser.username}`,
                 status: 'success',
                 ipAddress: 'internal'
             });

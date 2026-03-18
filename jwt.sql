@@ -55,25 +55,17 @@ DROP FUNCTION IF EXISTS handle_user_woreda_assignment CASCADE;
 -- 2. CREATE JWT HELPER FUNCTIONS (in public schema)
 -- ==========================================
 
--- Helper for RLS readability - get woreda_id from JWT
+-- Helper for RLS readability - get woreda_id from public.users (REAL-TIME, efficient)
 CREATE OR REPLACE FUNCTION public.m_woreda_id() 
 RETURNS UUID AS $$
-BEGIN
-  RETURN ((auth.jwt()) -> 'app_metadata' ->> 'woreda_id')::UUID;
-EXCEPTION WHEN OTHERS THEN
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql STABLE;
+  SELECT woreda_id FROM public.users WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 
--- Helper for RLS readability - get role from JWT
+-- Helper for RLS readability - get role from public.users (REAL-TIME, efficient)
 CREATE OR REPLACE FUNCTION public.m_role() 
 RETURNS TEXT AS $$
-BEGIN
-  RETURN COALESCE(((auth.jwt()) -> 'app_metadata' ->> 'role'), 'None');
-EXCEPTION WHEN OTHERS THEN
-  RETURN 'None';
-END;
-$$ LANGUAGE plpgsql STABLE;
+  SELECT role FROM public.users WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 
 -- ==========================================
 -- 3. CREATE ENHANCED ROLE SYNC TRIGGER
@@ -382,8 +374,24 @@ SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
 FROM pg_policies
 ORDER BY tablename, policyname;
 
--- Test JWT helper functions (run when logged in)
+-- Test REAL-TIME helper functions (run when logged in)
 SELECT public.m_role();
 SELECT public.m_woreda_id();
+
+-- Check RLS enabled
+SELECT relname, relrowsecurity FROM pg_class WHERE relname = 'users';
+
+-- Test trigger: Update a user and check metadata sync
+UPDATE public.users SET role = 'TestRole' WHERE id = auth.uid();
+SELECT raw_app_metadata->'role' FROM auth.users WHERE id = auth.uid();
+
+-- Bulk sync all users metadata (run once if needed)
+UPDATE auth.users 
+SET raw_app_metadata = COALESCE(raw_app_metadata, '{}'::jsonb) || 
+  jsonb_build_object(
+    'role', (SELECT role FROM public.users WHERE id = auth.users.id), 
+    'woreda_id', (SELECT woreda_id FROM public.users WHERE id = auth.users.id)
+  ) 
+WHERE id IN (SELECT id FROM public.users);
 
 */
