@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import type { ClerkView } from '../../App';
 import { getPlates, getPayments, getVehicles, getDrivers, getViolations } from '../../database';
 import { useTranslation } from 'react-i18next';
 import { FaCar, FaIdCard, FaArrowRight, FaExclamationTriangle, FaFileInvoiceDollar } from 'react-icons/fa';
 import { MdPayments, MdInventory } from 'react-icons/md';
 import { BiSolidCarGarage } from 'react-icons/bi';
 import { FiClock, FiCheckCircle } from 'react-icons/fi';
-import { Vehicle, Driver, PlateItem, Payment, Violation, UserRole } from '../../types';
+import { Vehicle, Driver, PlateItem, Payment, Violation, UserRole, ClerkView } from '../../types';
 
 interface ClerkDashboardProps {
   onNavigate: (view: ClerkView) => void;

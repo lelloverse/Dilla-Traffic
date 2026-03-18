@@ -32,7 +32,7 @@ const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({ profileData
     }, []);
 
     const vehicle = localVehicles.find(v => v.id === profileData.id);
-    const isStolen = vehicle?.stolen_status?.isStolen;
+    const isStolen = vehicle?.stolenStatus?.isStolen;
 
     const filteredDrivers = driverSearch.length >= 2 
         ? allDrivers.filter(d => 
@@ -76,7 +76,7 @@ const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({ profileData
             <span className="mr-4 flex items-center"><FaExclamationTriangle size={32} /></span>
             <div>
               <h2 className="text-xl font-black uppercase tracking-tighter">Warning: This Vehicle is Reported STOLEN</h2>
-              <p className="text-sm opacity-90">Reported on {new Date(vehicle?.stolen_status?.reportedAt || '').toLocaleString()} by {vehicle?.stolen_status?.reportedBy}</p>
+              <p className="text-sm opacity-90">Reported on {new Date(vehicle?.stolenStatus?.reportedAt || '').toLocaleString()} by {vehicle?.stolenStatus?.reportedBy}</p>
             </div>
           </div>
         )}

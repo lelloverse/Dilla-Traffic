@@ -265,7 +265,7 @@ export const translations = {
     viewFullAuditTrail: "View Full Audit Trail",
     financialOverview: "Financial Overview",
     weeklyRevenue: "Weekly Revenue",
-    vsLastWeek: "+12% vs last week",
+    vsLastWeek: "{{percentage}}% vs last week",
     downloadDetailedReport: "Download Detailed Report",
     justNow: "Just now",
     m_ago: "{{count}}m ago",
@@ -338,6 +338,11 @@ export const translations = {
     saving: "Saving...",
     saveChanges: "Save Changes",
     registerUser: "Register User",
+    collectionRate: "Collection Rate",
+    totalViolations: "Total Violations",
+    assignedOfficers: "Assigned Officers",
+    totalFines: "Total Fines",
+    assignedDistrict: "Assigned District",
   },
   am: {
     // App
@@ -605,7 +610,7 @@ export const translations = {
     viewFullAuditTrail: "ሙሉ የኦዲት ዝርዝር ይመልከቱ",
     financialOverview: "የፋይናንስ አጠቃላይ እይታ",
     weeklyRevenue: "ሳምንታዊ ገቢ",
-    vsLastWeek: "+12% ካለፈው ሳምንት ጋር ሲነጻጸር",
+    vsLastWeek: "{{percentage}}% ካለፈው ሳምንት ጋር ሲነጻጸር",
     downloadDetailedReport: "ዝርዝር ሪፖርት ያውርዱ",
     justNow: "አሁን",
     m_ago: "ከ {{count}} ደቂቃ በፊት",
@@ -678,5 +683,10 @@ export const translations = {
     saving: "በማስቀመጥ ላይ...",
     saveChanges: "ለውጦችን አስቀምጥ",
     registerUser: "ተጠቃሚ መዝግብ",
+    collectionRate: "የስብስብ መጠን",
+    totalViolations: "ጠቅላላ ጥሰቶች",
+    assignedOfficers: "የተመደቡ ኦፊሰሮች",
+    totalFines: "ጠቅላላ ቅጣቶች",
+    assignedDistrict: "የተመደበ ወረዳ",
   }
 };

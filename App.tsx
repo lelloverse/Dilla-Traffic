@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { UserRole, Application, SearchResult, ProfileData, User, Vehicle } from './types';
+import { UserRole, Application, SearchResult, ProfileData, User, Vehicle, ClerkView, AdminView } from './types';
 import { getSearchResults, getUsers, addUser, getVehicles } from './database';
 import { supabase } from './supabaseClient';
 import { ToastProvider } from './context/ToastContext';
@@ -31,14 +31,10 @@ import VehicleProfileScreen from './components/shared/VehicleProfileScreen';
 import DriverProfileScreen from './components/shared/DriverProfileScreen';
 
 
-// Define the possible views for each role
-export type ClerkView = 'dashboard' | 'new-vehicle' | 'new-license' | 'payments' | 'plates' | 'vehicles' | 'drivers' | 'violations' | 'alerts';
-export type AdminView = 'dashboard' | 'user-management' | 'report-generator' | 'audit-logs';
-
-
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<UserRole>(UserRole.None);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -82,14 +78,40 @@ const App: React.FC = () => {
 
     try {
         // Find the user in our profile table first to get their email and status
-        const { data: userData, error: userError } = await supabase
+        // Check username first
+        let { data: users, error: userError } = await supabase
             .from('users')
-            .select('email, role, status, can_access_web')
-            .eq('username', username)
-            .single();
+            .select('id, name, username, email, role, woreda_id, status, can_access_web, can_access_mobile')
+            .eq('username', username);
 
-        if (userError || !userData?.email) {
+        if (userError) {
+            console.error('User fetch error:', userError);
+        }
+
+        // If not found by username, try searching by email
+        if (!users || users.length === 0) {
+            const { data: usersByEmail, error: emailError } = await supabase
+                .from('users')
+                .select('id, name, username, email, role, woreda_id, status, can_access_web, can_access_mobile')
+                .eq('email', username);
+            
+            if (emailError) {
+                console.error('Email fetch error:', emailError);
+            }
+            
+            if (usersByEmail && usersByEmail.length > 0) {
+                users = usersByEmail;
+            }
+        }
+        
+        const userData = users && users.length > 0 ? users[0] : null;
+
+        if (!userData) {
             throw new Error('Invalid username or password.');
+        }
+
+        if (!userData.email) {
+            throw new Error('User account is missing an email address. Please contact an administrator.');
         }
 
         if (userData.status !== 'Active') {
@@ -105,11 +127,25 @@ const App: React.FC = () => {
             password: password,
         });
 
-        if (authError) throw authError;
+        if (authError) {
+            throw new Error(authError.message === 'Invalid login credentials' ? 'Invalid username or password.' : authError.message);
+        }
 
         if (data.user) {
             setIsLoggedIn(true);
-            setUserRole(userData.role);
+            setUserRole(userData.role as UserRole);
+            setCurrentUser({
+                id: userData.id,
+                name: userData.name,
+                username: userData.username,
+                email: userData.email,
+                role: userData.role as UserRole,
+                woredaId: userData.woreda_id,
+                status: userData.status as 'Active' | 'Inactive',
+                canAccessWeb: userData.can_access_web,
+                canAccessMobile: userData.can_access_mobile,
+                lastLogin: new Date().toISOString()
+            });
         }
     } catch (err: any) {
         setError(err.message || 'Invalid username or password.');
@@ -130,7 +166,7 @@ const App: React.FC = () => {
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     setSelectedProfile(null); // Clear profile when starting a new search
-    const results = await getSearchResults();
+    const results = await getSearchResults(query);
     setSearchResultsData(results);
   };
   
@@ -175,14 +211,14 @@ const App: React.FC = () => {
   const renderAdminView = () => {
     switch (adminView) {
       case 'user-management':
-        return <UserManagementScreen onBack={() => setAdminView('dashboard')} />;
+        return <UserManagementScreen onBack={() => setAdminView('dashboard')} currentUser={currentUser} />;
       case 'report-generator':
-        return <ReportGeneratorScreen onBack={() => setAdminView('dashboard')} />;
+        return <ReportGeneratorScreen onBack={() => setAdminView('dashboard')} currentUser={currentUser} />;
       case 'audit-logs':
-        return <AuditLogScreen onBack={() => setAdminView('dashboard')} />;
+        return <AuditLogScreen onBack={() => setAdminView('dashboard')} currentUser={currentUser} />;
       case 'dashboard':
       default:
-        return <AdminDashboard onNavigate={setAdminView} />;
+        return <AdminDashboard onNavigate={setAdminView} currentUser={currentUser} />;
     }
   };
 
@@ -192,6 +228,7 @@ const App: React.FC = () => {
       case UserRole.Officer:
         return renderClerkView();
       case UserRole.Admin:
+      case UserRole.WoredaAdmin:
         return renderAdminView();
       default:
          handleLogout();
@@ -235,7 +272,7 @@ const App: React.FC = () => {
                         <ul className="divide-y divide-gray-200">
                            {filteredResults.map(result => {
                                const vehicle = result.type === 'Vehicle' ? vehicles.find(v => v.id === result.id) : null;
-                               const isStolen = vehicle?.stolen_status?.isStolen;
+                               const isStolen = vehicle?.stolenStatus?.isStolen;
                                
                                return (
                                <li key={result.id} className={`py-3 flex justify-between items-center hover:bg-gray-50 px-2 rounded-lg transition ${isStolen ? 'bg-red-50' : ''}`}>

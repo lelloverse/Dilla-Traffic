@@ -320,5 +320,10 @@
     "reset": "Reset",
     "saving": "Saving...",
     "saveChanges": "Save Changes",
-    "registerUser": "Register User"
+    "registerUser": "Register User",
+    "assignedDistrict": "Assigned District",
+    "totalFines": "Total Fines",
+    "assignedOfficers": "Assigned Officers",
+    "totalViolations": "Total Violations",
+    "collectionRate": "Collection Rate"
 }

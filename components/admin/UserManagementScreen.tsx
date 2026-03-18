@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserRole, User } from '../../types';
-import { getUsers, updateUser, addUser, addAuditLog } from '../../database';
+import { getUsers, updateUser, addUser, addAuditLog, getWoredas } from '../../database';
 import { useToast } from '../../context/ToastContext';
 import { FaUserPlus, FaShieldAlt } from 'react-icons/fa';
 import { supabase } from '../../supabaseClient';
@@ -9,12 +9,14 @@ import { useTranslation } from 'react-i18next';
 
 interface UserManagementScreenProps {
   onBack: () => void;
+  currentUser: User | null;
 }
 
-const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) => {
+const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, currentUser }) => {
     const { t } = useTranslation();
     const { addToast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
+    const [woredas, setWoredas] = useState<any[]>([]);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -34,11 +36,15 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
     });
 
     useEffect(() => {
-        const fetchUsers = async () => {
-            const data = await getUsers();
-            setUsers(data);
+        const fetchData = async () => {
+            const [userData, woredaData] = await Promise.all([
+                getUsers(),
+                getWoredas()
+            ]);
+            setUsers(userData);
+            setWoredas(woredaData);
         };
-        fetchUsers();
+        fetchData();
     }, []);
 
     const handleDeactivate = async (user: User) => {
@@ -105,6 +111,8 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                     return;
                 }
 
+                const targetWoredaId = currentUser?.role === UserRole.WoredaAdmin ? currentUser.woredaId : newUser.woredaId;
+
                 // 1. Create in Supabase Auth
                 const { data: authData, error: authError } = await supabase.auth.signUp({
                     email: newUser.email,
@@ -113,6 +121,8 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                         data: {
                             full_name: newUser.name,
                             username: newUser.username,
+                            role: newUser.role,
+                            woreda_id: targetWoredaId
                         }
                     }
                 });
@@ -126,6 +136,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                         username: newUser.username!,
                         email: newUser.email!,
                         role: newUser.role || UserRole.Clerk,
+                        woredaId: targetWoredaId,
                         lastLogin: 'Never',
                         status: 'Active',
                         password: newUser.password,
@@ -138,9 +149,9 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                     
                     await addAuditLog({
                         action: 'USER_CREATED',
-                        user: 'Admin',
-                        role: 'Admin',
-                        details: `Created new user: ${newUser.username} (${newUser.role})`,
+                        user: currentUser?.username || 'Admin',
+                        role: currentUser?.role || 'Admin',
+                        details: `Created new user: ${newUser.username} (${newUser.role}) in Woreda: ${createdUser.woredaId || 'Global'}`,
                         status: 'success',
                         ipAddress: 'internal'
                     });
@@ -245,6 +256,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                         <th scope="col" className="px-6 py-3">{t('name')}</th>
                         <th scope="col" className="px-6 py-3">{t('usernameEmail')}</th>
                         <th scope="col" className="px-6 py-3">{t('role')}</th>
+                        {currentUser?.role === UserRole.Admin && <th scope="col" className="px-6 py-3">Woreda</th>}
                         <th scope="col" className="px-6 py-3">{t('status')}</th>
                         <th scope="col" className="px-6 py-3 text-right">{t('actions')}</th>
                     </tr>
@@ -285,6 +297,13 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                                     </div>
                                 </div>
                             </td>
+                            {currentUser?.role === UserRole.Admin && (
+                                <td className="px-6 py-4">
+                                    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                                        {woredas.find(w => w.id === user.woredaId)?.name || 'Global'}
+                                    </span>
+                                </td>
+                            )}
                             <td className="px-6 py-4">
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
                                     user.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -294,13 +313,19 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                                <button onClick={() => handleEditClick(user)} className="font-medium text-blue-600 hover:underline px-2">{t('edit')}</button>
-                                <button 
-                                    onClick={() => handleDeactivate(user)} 
-                                    className={`font-medium hover:underline px-2 ${user.status === 'Active' ? 'text-red-600' : 'text-green-600'}`}
-                                >
-                                    {user.status === 'Active' ? t('deactivate') : t('activate')}
-                                </button>
+                                <div className="flex justify-end gap-2">
+                                    {(currentUser?.role === UserRole.Admin || (currentUser?.role === UserRole.WoredaAdmin && (user.role === UserRole.Officer || user.role === UserRole.Clerk))) && (
+                                        <>
+                                            <button onClick={() => handleEditClick(user)} className="font-medium text-blue-600 hover:underline px-2">{t('edit')}</button>
+                                            <button 
+                                                onClick={() => handleDeactivate(user)} 
+                                                className={`font-medium hover:underline px-2 ${user.status === 'Active' ? 'text-red-600' : 'text-green-600'}`}
+                                            >
+                                                {user.status === 'Active' ? t('deactivate') : t('activate')}
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
                             </td>
                         </tr>
                     ))}
@@ -311,77 +336,112 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
 
       {/* Edit/Create User Modal */}
       {showEditModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white p-5 rounded-lg shadow-xl w-full max-w-sm animate-fade-in">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+              <div className="bg-white p-5 rounded-lg shadow-xl w-full max-w-lg my-8 animate-fade-in">
                   <h3 className="text-lg font-bold mb-3 text-gray-900">{isCreating ? t('registerNewUser') : t('editUser', { name: selectedUser?.name })}</h3>
                   <form onSubmit={(e) => { e.preventDefault(); handleSaveChanges(); }}>
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-xs font-medium mb-1 text-gray-700">{t('fullName')}</label>
-                            <input 
-                                type="text" 
-                                required
-                                value={isCreating ? newUser.name : selectedUser?.name} 
-                                onChange={e => isCreating ? setNewUser({...newUser, name: e.target.value}) : setSelectedUser({...selectedUser!, name: e.target.value})}
-                                className="w-full p-1.5 text-sm border rounded bg-white"
-                                placeholder="e.g. John Doe"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium mb-1 text-gray-700">{t('emailAddress')}</label>
-                            <input 
-                                type="email" 
-                                required
-                                value={isCreating ? newUser.email : selectedUser?.email} 
-                                onChange={e => isCreating ? setNewUser({...newUser, email: e.target.value}) : setSelectedUser({...selectedUser!, email: e.target.value})}
-                                className="w-full p-1.5 text-sm border rounded bg-white"
-                                placeholder="user@example.com"
-                                readOnly={!isCreating}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium mb-1 text-gray-700">{t('username')}</label>
-                            <input 
-                                type="text" 
-                                required
-                                value={isCreating ? newUser.username : selectedUser?.username} 
-                                onChange={e => isCreating ? setNewUser({...newUser, username: e.target.value}) : setSelectedUser({...selectedUser!, username: e.target.value})}
-                                className="w-full p-1.5 text-sm border rounded bg-white"
-                                placeholder="e.g. jdoe"
-                                readOnly={!isCreating}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="role" className="block text-xs font-medium mb-1 text-gray-700">{t('role')}</label>
-                            <select 
-                                id="role" 
-                                value={isCreating ? newUser.role : selectedUser?.role} 
-                                onChange={e => isCreating ? setNewUser({...newUser, role: e.target.value as UserRole}) : setSelectedUser({...selectedUser!, role: e.target.value as UserRole})} 
-                                className="w-full p-1.5 text-sm border rounded bg-white"
-                            >
-                                {Object.values(UserRole).filter(r => r !== UserRole.None).map(role => <option key={role} value={role}>{role}</option>)}
-                            </select>
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-700">{t('fullName')}</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={isCreating ? newUser.name : selectedUser?.name} 
+                                    onChange={e => isCreating ? setNewUser({...newUser, name: e.target.value}) : setSelectedUser({...selectedUser!, name: e.target.value})}
+                                    className="w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="e.g. John Doe"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-700">{t('emailAddress')}</label>
+                                <input 
+                                    type="email" 
+                                    required
+                                    value={isCreating ? newUser.email : selectedUser?.email} 
+                                    onChange={e => isCreating ? setNewUser({...newUser, email: e.target.value}) : setSelectedUser({...selectedUser!, email: e.target.value})}
+                                    className="w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="user@example.com"
+                                    readOnly={!isCreating}
+                                />
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 p-2 bg-blue-50/50 rounded-lg border border-blue-100">
-                            <label className="flex items-center gap-2 cursor-pointer group">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-700">{t('username')}</label>
                                 <input 
-                                    type="checkbox"
-                                    checked={isCreating ? newUser.canAccessWeb : selectedUser?.canAccessWeb}
-                                    onChange={e => isCreating ? setNewUser({...newUser, canAccessWeb: e.target.checked}) : setSelectedUser({...selectedUser!, canAccessWeb: e.target.checked})}
-                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                    type="text" 
+                                    required
+                                    value={isCreating ? newUser.username : selectedUser?.username} 
+                                    onChange={e => isCreating ? setNewUser({...newUser, username: e.target.value}) : setSelectedUser({...selectedUser!, username: e.target.value})}
+                                    className="w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="e.g. jdoe"
+                                    readOnly={!isCreating}
                                 />
-                                <span className="text-xs font-medium text-gray-700 group-hover:text-blue-600 transition">{t('webAccess')}</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                                <input 
-                                    type="checkbox"
-                                    checked={isCreating ? newUser.canAccessMobile : selectedUser?.canAccessMobile}
-                                    onChange={e => isCreating ? setNewUser({...newUser, canAccessMobile: e.target.checked}) : setSelectedUser({...selectedUser!, canAccessMobile: e.target.checked})}
-                                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <span className="text-xs font-medium text-gray-700 group-hover:text-blue-600 transition">{t('mobileAccess')}</span>
-                            </label>
+                            </div>
+                            <div>
+                                <label htmlFor="role" className="block text-xs font-medium mb-1 text-gray-700">{t('role')}</label>
+                                <select 
+                                    id="role" 
+                                    value={isCreating ? newUser.role : selectedUser?.role} 
+                                    onChange={e => isCreating ? setNewUser({...newUser, role: e.target.value as UserRole}) : setSelectedUser({...selectedUser!, role: e.target.value as UserRole})} 
+                                    className="w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                    {Object.values(UserRole)
+                                        .filter(r => r !== UserRole.None)
+                                        .filter(r => {
+                                            if (currentUser?.role === UserRole.WoredaAdmin) {
+                                                return r === UserRole.Clerk || r === UserRole.Officer;
+                                            }
+                                            return true;
+                                        })
+                                        .map(role => <option key={role} value={role}>{role}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Woreda Selection - Hidden for WoredaAdmin */}
+                        {currentUser?.role === UserRole.Admin && (
+                            <div>
+                                <label htmlFor="woreda" className="block text-xs font-medium mb-1 text-gray-700">Woreda / District</label>
+                                <select 
+                                    id="woreda" 
+                                    value={isCreating ? (newUser.woredaId || '') : (selectedUser?.woredaId || '')} 
+                                    onChange={e => {
+                                        const val = e.target.value || undefined;
+                                        isCreating ? setNewUser({...newUser, woredaId: val}) : setSelectedUser({...selectedUser!, woredaId: val});
+                                    }} 
+                                    className="w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                    <option value="">Global / No Woreda</option>
+                                    {woredas.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                </select>
+                            </div>
+                        )}
+
+                        <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                            <p className="text-xs font-bold text-blue-700 mb-3 uppercase tracking-wider">Access Permissions</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <label className="flex items-center gap-3 cursor-pointer group p-2 bg-white rounded border border-blue-100 hover:border-blue-300 transition">
+                                    <input 
+                                        type="checkbox"
+                                        checked={isCreating ? newUser.canAccessWeb : selectedUser?.canAccessWeb}
+                                        onChange={e => isCreating ? setNewUser({...newUser, canAccessWeb: e.target.checked}) : setSelectedUser({...selectedUser!, canAccessWeb: e.target.checked})}
+                                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition">{t('webAccess')}</span>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer group p-2 bg-white rounded border border-blue-100 hover:border-blue-300 transition">
+                                    <input 
+                                        type="checkbox"
+                                        checked={isCreating ? newUser.canAccessMobile : selectedUser?.canAccessMobile}
+                                        onChange={e => isCreating ? setNewUser({...newUser, canAccessMobile: e.target.checked}) : setSelectedUser({...selectedUser!, canAccessMobile: e.target.checked})}
+                                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition">{t('mobileAccess')}</span>
+                                </label>
+                            </div>
                         </div>
                         
                         {isCreating && (
@@ -392,28 +452,28 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                                     required
                                     value={newUser.password}
                                     onChange={e => setNewUser({...newUser, password: e.target.value})}
-                                    className="w-full p-1.5 text-sm border rounded bg-white" 
+                                    className="w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none" 
                                     placeholder={t('passwordMinLength')}
                                 />
-                                <p className="text-[10px] text-gray-500 mt-0.5">{t('provideSecurePassword')}</p>
+                                <p className="text-[10px] text-gray-500 mt-1">{t('provideSecurePassword')}</p>
                             </div>
                         )}
 
                         {!isCreating && (
-                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <label className="block text-xs font-medium mb-1.5 text-gray-700">{t('securityResetPassword')}</label>
+                             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <label className="block text-xs font-medium mb-2 text-gray-700">{t('securityResetPassword')}</label>
                                  <div className="flex gap-2">
                                      <input 
                                         type="password" 
                                         value={resetPasswordValue}
                                         onChange={(e) => setResetPasswordValue(e.target.value)}
                                         placeholder={t('newPassword')}
-                                        className="flex-1 p-1.5 text-xs border rounded bg-white"
+                                        className="flex-1 p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-yellow-500 outline-none"
                                      />
                                      <button 
                                         type="button" 
                                         onClick={handlePasswordReset}
-                                        className="px-2.5 py-1.5 bg-yellow-600 text-white text-xs font-semibold rounded hover:bg-yellow-700 transition"
+                                        className="px-4 py-2 bg-yellow-600 text-white text-xs font-semibold rounded hover:bg-yellow-700 transition"
                                      >
                                         {t('reset')}
                                      </button>
@@ -421,9 +481,9 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack }) =
                             </div>
                         )}
                     </div>
-                      <div className="flex justify-end gap-2 mt-6 pt-3 border-t border-gray-200">
-                          <button type="button" onClick={() => setShowEditModal(false)} className="px-3 py-1.5 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition" disabled={isSaving}>{t('cancel')}</button>
-                          <button type="submit" className="px-3 py-1.5 text-sm bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition disabled:bg-blue-400" disabled={isSaving}>
+                      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+                          <button type="button" onClick={() => setShowEditModal(false)} className="px-5 py-2 text-sm bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition font-medium" disabled={isSaving}>{t('cancel')}</button>
+                          <button type="submit" className="px-5 py-2 text-sm bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition disabled:bg-blue-400" disabled={isSaving}>
                               {isSaving ? t('saving') : (isCreating ? t('registerUser') : t('saveChanges'))}
                           </button>
                       </div>

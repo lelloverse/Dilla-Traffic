@@ -2,6 +2,7 @@
 export enum UserRole {
   Clerk = 'Clerk',
   Admin = 'Admin',
+  WoredaAdmin = 'WoredaAdmin',
   Officer = 'Officer',
   None = 'None'
 }
@@ -72,7 +73,7 @@ export interface Vehicle {
     type: 'private' | 'commercial' | 'motorcycle' | 'truck' | 'bus';
     status: 'Active' | 'Expired' | 'Suspended' | 'Stolen';
     expiryDate: string;
-    stolen_status?: {
+    stolenStatus?: {
         isStolen: boolean;
         reportedAt?: string;
         reportedBy?: string;
@@ -128,6 +129,7 @@ export type User = {
     username: string;
     email?: string;
     role: UserRole;
+    woredaId?: string;
     lastLogin: string;
     password?: string;
     status: 'Active' | 'Inactive';
@@ -150,6 +152,7 @@ export interface AuditLog {
     details: string;
     ipAddress: string;
     status: 'success' | 'failure';
+    woredaId?: string; // Add this for woreda isolation
 }
 
 export interface Alert {
@@ -165,3 +168,14 @@ export interface Alert {
     createdAt: string;
     updatedAt: string;
 }
+
+export interface Woreda {
+    id: string;
+    name: string;
+    zone: string;
+    code: string;
+}
+
+// View Types for Navigation
+export type ClerkView = 'dashboard' | 'new-vehicle' | 'new-license' | 'payments' | 'plates' | 'vehicles' | 'drivers' | 'violations' | 'alerts';
+export type AdminView = 'dashboard' | 'user-management' | 'report-generator' | 'audit-logs';

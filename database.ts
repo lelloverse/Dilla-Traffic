@@ -1,6 +1,6 @@
 // database.ts
 import { supabase } from './supabaseClient';
-import { Vehicle, Driver, Violation, User, SearchResult, Alert } from './types';
+import { Vehicle, Driver, Violation, User, SearchResult, Alert, PlateItem, Payment, AuditLog, Woreda } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Mapping Helpers ---
@@ -30,12 +30,29 @@ const mapToCamel = (row: any) => {
     return mapped;
 };
 
-// --- Vehicles API ---
-export const getVehicles = async (): Promise<Vehicle[]> => {
+// --- Woreda API ---
+export const getWoredas = async (): Promise<Woreda[]> => {
     const { data, error } = await supabase
+        .from('woredas')
+        .select('*');
+    if (error) throw error;
+    return (data || []).map(mapToCamel) as Woreda[];
+};
+
+// --- Vehicles API ---
+export const getVehicles = async (plateNumber?: string): Promise<Vehicle[]> => {
+    let query = supabase
         .from('vehicles')
         .select('*')
         .is('deleted_at', null);
+    
+    if (plateNumber) {
+        query = query.eq('plate_number', plateNumber);
+    } else {
+        query = query.limit(100); // Default limit for general list
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(mapToCamel) as Vehicle[];
 };
@@ -55,7 +72,7 @@ export const updateVehicle = async (vehicle: Vehicle): Promise<void> => {
             owner_phone: v.ownerPhone,
             status: v.status,
             expiry_date: v.expiryDate,
-            stolen_status: v.stolen_status,
+            stolen_status: v.stolenStatus,
             // Additional fields from Registration Flow
             address: v.address,
             national_id: v.nationalId,
@@ -92,11 +109,11 @@ export const unmarkVehicleAsStolen = async (vehicleId: string): Promise<void> =>
     if (error) throw error;
 };
 
-export const transferVehicleOwnership = async (vehicleId: string, newOwner: any): Promise<void> => {
+export const transferVehicleOwnership = async (vehicleId: string, newOwner: Driver): Promise<void> => {
     const { error } = await supabase
         .from('vehicles')
         .update({
-            owner_name: newOwner.fullName || newOwner.name,
+            owner_name: newOwner.fullName,
             owner_phone: newOwner.phone || ''
         })
         .eq('id', vehicleId);
@@ -104,11 +121,19 @@ export const transferVehicleOwnership = async (vehicleId: string, newOwner: any)
 };
 
 // --- Drivers API ---
-export const getDrivers = async (): Promise<Driver[]> => {
-    const { data, error } = await supabase
+export const getDrivers = async (licenseNumber?: string): Promise<Driver[]> => {
+    let query = supabase
         .from('drivers')
         .select('*')
         .is('deleted_at', null);
+    
+    if (licenseNumber) {
+        query = query.eq('license_number', licenseNumber);
+    } else {
+        query = query.limit(100); // Default limit for general list
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(mapToCamel) as Driver[];
 };
@@ -164,7 +189,7 @@ export const updateViolation = async (violation: Violation): Promise<void> => {
         .update({
             status: v.status,
             amount_paid: v.amountPaid,
-            payment_history: JSON.stringify(v.paymentHistory)
+            payment_history: v.paymentHistory
         })
         .eq('id', v.id);
     if (error) throw error;
@@ -189,15 +214,19 @@ export const getUsers = async (): Promise<User[]> => {
 
 export const addUser = async (user: User): Promise<void> => {
     const u = user as any;
+    
+    // IMPORTANT: Don't generate a new UUID here!
+    // The user.id should already be the auth.users ID
     const { error } = await supabase
         .from('users')
-        .insert({
-            id: u.id || uuidv4(),
+        .upsert({ 
+            id: u.id, // Remove the || uuidv4() - this must be the auth.users ID
             name: u.name,
             username: u.username,
             email: u.email,
             password: u.password,
             role: u.role,
+            woreda_id: u.woredaId,
             status: u.status || 'Active',
             can_access_web: u.canAccessWeb ?? true,
             can_access_mobile: u.canAccessMobile ?? false
@@ -212,6 +241,7 @@ export const updateUser = async (user: User): Promise<void> => {
         username: u.username,
         email: u.email,
         role: u.role,
+        woreda_id: u.woredaId,
         status: u.status,
         can_access_web: u.canAccessWeb,
         can_access_mobile: u.canAccessMobile
@@ -229,15 +259,15 @@ export const updateUser = async (user: User): Promise<void> => {
 };
 
 // --- Plates API ---
-export const getPlates = async (): Promise<any[]> => {
+export const getPlates = async (): Promise<PlateItem[]> => {
     const { data, error } = await supabase
         .from('plates')
         .select('*');
     if (error) throw error;
-    return (data || []).map(mapToCamel);
+    return (data || []).map(mapToCamel) as PlateItem[];
 };
 
-export const addPlate = async (plate: any): Promise<void> => {
+export const addPlate = async (plate: PlateItem): Promise<void> => {
     const { error } = await supabase
         .from('plates')
         .insert({
@@ -250,15 +280,15 @@ export const addPlate = async (plate: any): Promise<void> => {
 };
 
 // --- Payments API ---
-export const getPayments = async (): Promise<any[]> => {
+export const getPayments = async (): Promise<Payment[]> => {
     const { data, error } = await supabase
         .from('payments')
         .select('*');
     if (error) throw error;
-    return (data || []).map(mapToCamel);
+    return (data || []).map(mapToCamel) as Payment[];
 };
 
-export const addPayment = async (payment: any): Promise<void> => {
+export const addPayment = async (payment: Payment): Promise<void> => {
     const p = payment as any;
     const { error } = await supabase
         .from('payments')
@@ -275,13 +305,19 @@ export const addPayment = async (payment: any): Promise<void> => {
 };
 
 // --- Audit Logs API ---
-export const getAuditLogs = async (): Promise<any[]> => {
-    const { data, error } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('timestamp', { ascending: false });
-    if (error) throw error;
-    return (data || []).map(mapToCamel);
+export const getAuditLogs = async (): Promise<AuditLog[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('audit_logs')
+            .select('*')
+            .order('timestamp', { ascending: false });
+        
+        if (error) throw error;
+        return (data || []).map(mapToCamel) as AuditLog[];
+    } catch (error) {
+        console.error('Error fetching audit logs:', error);
+        throw error;
+    }
 };
 
 export const addAuditLog = async (log: any): Promise<void> => {
@@ -305,14 +341,36 @@ export const updateApplication = async (app: any): Promise<void> => {
     if (error) throw error;
 };
 
+// --- Woreda Dashboard API ---
+export const getWoredaDashboard = async (woredaId: string): Promise<any> => {
+    const { data, error } = await supabase
+        .from('woreda_dashboard')
+        .select('*')
+        .eq('woreda_id', woredaId)
+        .single();
+    if (error) throw error;
+    return mapToCamel(data);
+};
+
 // --- Search API ---
-export const getSearchResults = async (): Promise<SearchResult[]> => {
+export const getSearchResults = async (query?: string): Promise<SearchResult[]> => {
+    let vQuery = supabase.from('vehicles').select('id, plate_number').is('deleted_at', null);
+    let dQuery = supabase.from('drivers').select('id, full_name').is('deleted_at', null);
+
+    if (query && query.trim()) {
+        const searchTerm = `%${query.trim()}%`;
+        vQuery = vQuery.ilike('plate_number', searchTerm);
+        dQuery = dQuery.ilike('full_name', searchTerm);
+    }
+
     const [{ data: vData, error: vErr }, { data: dData, error: dErr }] = await Promise.all([
-        supabase.from('vehicles').select('id, plate_number').is('deleted_at', null),
-        supabase.from('drivers').select('id, full_name').is('deleted_at', null)
+        vQuery.limit(50),
+        dQuery.limit(50)
     ]);
+
     if (vErr) throw vErr;
     if (dErr) throw dErr;
+
     const vehicles = (vData || []).map((v: any) => ({
         id: v.id,
         title: v.plate_number,

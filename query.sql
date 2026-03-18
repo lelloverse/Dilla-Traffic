@@ -1,15 +1,15 @@
 -- ==========================================
 -- 1. NUCLEAR RESET (Clear the slate)
 -- ==========================================
-DROP TABLE IF EXISTS audit_logs, system_fees, violations, drivers, vehicles, plates, payments, users, applications, alerts, activities CASCADE;
-DROP FUNCTION IF EXISTS trigger_set_timestamp, get_user_role CASCADE;
+DROP TABLE IF EXISTS audit_logs, system_fees, violations, drivers, vehicles, plates, payments, users, applications, alerts, activities, woredas CASCADE;
+DROP FUNCTION IF EXISTS trigger_set_timestamp, get_user_role, set_violation_woreda, set_payment_woreda CASCADE;
 
 -- ==========================================
 -- 2. SETUP EXTENSIONS & FUNCTIONS
 -- ==========================================
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
-CREATE EXTENSION IF NOT EXISTS "pg_trgm" WITH SCHEMA extensions; -- Added for fast case-insensitive search
+CREATE EXTENSION IF NOT EXISTS "pg_trgm" WITH SCHEMA extensions; 
 
 -- Standard function to auto-update 'updated_at' columns
 CREATE OR REPLACE FUNCTION trigger_set_timestamp()
@@ -23,13 +23,79 @@ SECURITY DEFINER
 SET search_path = public;
 
 -- ==========================================
--- 3. CREATE TABLES (Pure Supabase Schema)
+-- 2. CREATE JWT HELPER FUNCTIONS (in public schema)
 -- ==========================================
+
+-- Helper for RLS readability - get woreda_id from JWT
+CREATE OR REPLACE FUNCTION public.m_woreda_id() 
+RETURNS UUID AS $$
+BEGIN
+  RETURN ((auth.jwt()) -> 'app_metadata' ->> 'woreda_id')::UUID;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Helper for RLS readability - get role from JWT
+CREATE OR REPLACE FUNCTION public.m_role() 
+RETURNS TEXT AS $$
+BEGIN
+  RETURN COALESCE(((auth.jwt()) -> 'app_metadata' ->> 'role'), 'None');
+EXCEPTION WHEN OTHERS THEN
+  RETURN 'None';
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- ==========================================
+-- 2.1 AUTH USER SYNC (Supabase Auth -> public.users)
+-- ==========================================
+
+-- Automatically create a profile in public.users when a new auth user is created
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, username, email, name, role, status, woreda_id)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'username', NEW.email),
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+    COALESCE(NEW.raw_app_meta_data->>'role', 'Clerk'),
+    'Active',
+    (NEW.raw_app_meta_data->>'woreda_id')::UUID
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger on auth.users (Supabase managed schema)
+-- Note: This requires high-level permissions; in local dev/SQL editor it usually works.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ==========================================
+-- 3. CREATE TABLES (Woreda-Aware Schema)
+-- ==========================================
+
+-- District/Woreda Table (Simplified - no geography)
+CREATE TABLE woredas (
+    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+    name TEXT NOT NULL,
+    zone TEXT DEFAULT 'Southern Dilla',
+    code TEXT UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     username TEXT UNIQUE NOT NULL,
     password TEXT, 
-    role TEXT NOT NULL DEFAULT 'Clerk',
+    role TEXT NOT NULL DEFAULT 'Clerk' CHECK (role IN ('Admin', 'WoredaAdmin', 'Officer', 'Clerk', 'None')),
+    woreda_id UUID REFERENCES woredas(id), -- Assigned District
     name TEXT, 
     email TEXT,
     status TEXT DEFAULT 'Active',
@@ -39,8 +105,19 @@ CREATE TABLE users (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Helper function to get current user role without recursion
--- Optimized with SECURITY DEFINER and STABLE to allow caching
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+    woreda_id UUID REFERENCES woredas(id),
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    "user" TEXT NOT NULL,
+    role TEXT,
+    action TEXT NOT NULL,
+    details TEXT,
+    ip_address TEXT,
+    status TEXT DEFAULT 'success'
+);
+
+-- Optimized role lookup (kept for backward compatibility)
 CREATE OR REPLACE FUNCTION get_user_role()
 RETURNS TEXT AS $$
   SELECT role FROM users WHERE id = (SELECT auth.uid());
@@ -69,7 +146,8 @@ CREATE TABLE vehicles (
     fuel_type TEXT,
     deleted_at TIMESTAMPTZ, 
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_sync_at TIMESTAMPTZ
 );
 
 CREATE TABLE drivers (
@@ -84,11 +162,13 @@ CREATE TABLE drivers (
     associated_vehicles JSONB DEFAULT '[]', 
     deleted_at TIMESTAMPTZ, 
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_sync_at TIMESTAMPTZ
 );
 
 CREATE TABLE violations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+    woreda_id UUID REFERENCES woredas(id), -- Originating District
     violation_type TEXT NOT NULL,
     driver_name TEXT,
     license_number TEXT, 
@@ -99,11 +179,12 @@ CREATE TABLE violations (
     payment_history JSONB DEFAULT '[]',
     deleted_at TIMESTAMPTZ, 
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_sync_at TIMESTAMPTZ
 );
 
 CREATE TABLE plates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
     plate_number TEXT UNIQUE NOT NULL,
     type TEXT, 
     status TEXT DEFAULT 'Available',
@@ -115,7 +196,8 @@ CREATE TABLE plates (
 );
 
 CREATE TABLE payments (
-    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text, 
+    id TEXT PRIMARY KEY DEFAULT extensions.uuid_generate_v4()::text, 
+    woreda_id UUID REFERENCES woredas(id),
     payer_name TEXT, 
     service_type TEXT, 
     amount NUMERIC NOT NULL,
@@ -128,18 +210,24 @@ CREATE TABLE payments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    "user" TEXT, 
-    role TEXT, 
-    action TEXT NOT NULL,
-    details TEXT,
-    ip_address TEXT, 
-    status TEXT, 
-    timestamp TIMESTAMPTZ DEFAULT NOW(),
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Alerts Table (Woreda-isolated)
+CREATE TABLE alerts (
+    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+    category TEXT NOT NULL CHECK (category IN ('System', 'BOLO', 'Security', 'Traffic')),
+    type TEXT, 
+    title TEXT NOT NULL,
+    description TEXT,
+    priority TEXT DEFAULT 'Low' CHECK (priority IN ('High', 'Medium', 'Low')),
+    location TEXT,
+    metadata JSONB DEFAULT '{}', 
+    is_active BOOLEAN DEFAULT TRUE,
+    woreda_id UUID REFERENCES woredas(id), -- For district-specific alerts
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Applications Table (if needed)
 CREATE TABLE applications (
     id TEXT PRIMARY KEY DEFAULT ('APP-' || upper(substring(md5(random()::text) from 1 for 9))), 
     type TEXT,
@@ -149,55 +237,262 @@ CREATE TABLE applications (
     last_name TEXT, 
     gender TEXT, 
     phone TEXT, 
+    email TEXT,
     details JSONB DEFAULT '{}', 
+    woreda_id UUID REFERENCES woredas(id),
     deleted_at TIMESTAMPTZ,
     submitted_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE alerts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    category TEXT NOT NULL, 
-    type TEXT, 
-    title TEXT NOT NULL,
-    description TEXT,
-    priority TEXT DEFAULT 'Low', 
-    location TEXT,
-    metadata JSONB DEFAULT '{}', 
-    is_active BOOLEAN DEFAULT TRUE,
-    deleted_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
+-- Activities Table (for real-time feed)
 CREATE TABLE activities (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
     type TEXT NOT NULL,
     status TEXT NOT NULL,
     target TEXT NOT NULL,
     icon TEXT NOT NULL,
     metadata JSONB DEFAULT '{}',
+    woreda_id UUID REFERENCES woredas(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ==========================================
--- 4. APPLY TIMESTAMPS TRIGGERS
+-- 4. BUSINESS LOGIC TRIGGERS
 -- ==========================================
+
+-- Enhanced Woreda Assignment Trigger for Violations
+CREATE OR REPLACE FUNCTION public.set_violation_woreda()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_woreda_id UUID;
+BEGIN
+    -- Try to find the woreda of the currently logged-in user
+    SELECT woreda_id INTO v_woreda_id 
+    FROM public.users 
+    WHERE id = auth.uid();
+    
+    -- Priority: User context first, fallback to explicit value (for service roles)
+    NEW.woreda_id := COALESCE(v_woreda_id, NEW.woreda_id);
+    
+    -- Safety Check: If no user context and no explicit ID provided, block the insert
+    IF NEW.woreda_id IS NULL THEN
+        RAISE EXCEPTION 'Transaction failed: woreda_id must be provided or derived from user context.';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_set_violation_woreda
+BEFORE INSERT ON violations
+FOR EACH ROW EXECUTE FUNCTION public.set_violation_woreda();
+
+-- Enhanced Woreda Assignment Trigger for Payments
+CREATE OR REPLACE FUNCTION public.set_payment_woreda()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_woreda_id UUID;
+BEGIN
+    -- Get current user's woreda context
+    SELECT woreda_id INTO v_woreda_id 
+    FROM public.users 
+    WHERE id = auth.uid();
+    
+    -- Prefer user context, but allow manual input (e.g., service roles/migration)
+    NEW.woreda_id := COALESCE(v_woreda_id, NEW.woreda_id);
+    
+    -- Validation: Prevent nulls for critical financial records
+    IF NEW.woreda_id IS NULL THEN
+        RAISE EXCEPTION 'Transaction aborted: woreda_id is required but missing from user profile and input.';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_set_payment_woreda
+BEFORE INSERT ON payments
+FOR EACH ROW EXECUTE FUNCTION public.set_payment_woreda();
+
+-- Auto-set woreda for applications
+CREATE OR REPLACE FUNCTION public.set_application_woreda()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_woreda_id UUID;
+BEGIN
+    SELECT woreda_id INTO v_woreda_id 
+    FROM public.users 
+    WHERE id = auth.uid();
+    
+    NEW.woreda_id := COALESCE(v_woreda_id, NEW.woreda_id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_set_application_woreda
+BEFORE INSERT ON applications
+FOR EACH ROW EXECUTE FUNCTION public.set_application_woreda();
+
+-- Auto-set woreda for activities
+CREATE OR REPLACE FUNCTION public.set_activity_woreda()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_woreda_id UUID;
+BEGIN
+    SELECT woreda_id INTO v_woreda_id 
+    FROM public.users 
+    WHERE id = auth.uid();
+    
+    NEW.woreda_id := COALESCE(v_woreda_id, NEW.woreda_id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_set_activity_woreda
+BEFORE INSERT ON activities
+FOR EACH ROW EXECUTE FUNCTION public.set_activity_woreda();
+
+-- Timestamp triggers
+CREATE TRIGGER set_timestamp_woredas BEFORE UPDATE ON woredas FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_users BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_vehicles BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_drivers BEFORE UPDATE ON drivers FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_violations BEFORE UPDATE ON violations FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_plates BEFORE UPDATE ON plates FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
-CREATE TRIGGER set_timestamp_applications BEFORE UPDATE ON applications FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
+CREATE TRIGGER set_timestamp_payments BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_alerts BEFORE UPDATE ON alerts FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
+CREATE TRIGGER set_timestamp_applications BEFORE UPDATE ON applications FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_activities BEFORE UPDATE ON activities FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 
 -- ==========================================
--- 5. ROW LEVEL SECURITY (RLS) POLICIES
+-- 5. AUTH METADATA SYNC (Supabase JWT Context)
 -- ==========================================
 
--- Enable RLS on all tables
+-- Syncs both role AND woreda_id to Supabase Auth app_metadata
+CREATE OR REPLACE FUNCTION public.sync_user_to_auth() 
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public 
+AS $$ 
+BEGIN 
+  -- Update auth.users metadata with role and woreda_id 
+  UPDATE auth.users 
+  SET raw_app_meta_data = 
+    COALESCE(raw_app_meta_data, '{}'::jsonb) || 
+    jsonb_build_object( 
+      'role', NEW.role, 
+      'woreda_id', NEW.woreda_id 
+    ) 
+  WHERE id = NEW.id; 
+  
+  RETURN NEW; 
+END; 
+$$; 
+
+DROP TRIGGER IF EXISTS sync_user_to_auth_trigger ON users; 
+CREATE TRIGGER sync_user_to_auth_trigger 
+  AFTER INSERT OR UPDATE OF role, woreda_id ON users 
+  FOR EACH ROW 
+  EXECUTE FUNCTION public.sync_user_to_auth(); 
+
+-- Bulk sync existing users
+UPDATE auth.users 
+SET raw_app_meta_data = 
+  COALESCE(raw_app_meta_data, '{}'::jsonb) || 
+  jsonb_build_object( 
+    'role', (SELECT role FROM public.users WHERE id = auth.users.id), 
+    'woreda_id', (SELECT woreda_id FROM public.users WHERE id = auth.users.id) 
+  ) 
+WHERE id IN (SELECT id FROM public.users);
+
+-- ==========================================
+-- 6. REFINED RLS POLICIES (Hierarchy & Isolation)
+-- ==========================================
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Auth: Login Lookup" ON users;
+DROP POLICY IF EXISTS "Admin: Regional Access" ON users;
+DROP POLICY IF EXISTS "WoredaAdmin: District View" ON users;
+DROP POLICY IF EXISTS "WoredaAdmin: District Manage" ON users;
+DROP POLICY IF EXISTS "Users: Self Update" ON users;
+DROP POLICY IF EXISTS "Auth: Signup Insert" ON users;
+
+CREATE POLICY "Auth: Login Lookup" ON users FOR SELECT TO anon USING (status = 'Active');
+CREATE POLICY "Admin: Regional Access" ON users FOR ALL TO authenticated USING (public.m_role() = 'Admin') WITH CHECK (public.m_role() = 'Admin');
+CREATE POLICY "WoredaAdmin: District View" ON users FOR SELECT TO authenticated USING ((public.m_role() = 'WoredaAdmin' AND woreda_id = public.m_woreda_id()) OR (id = auth.uid()));
+CREATE POLICY "WoredaAdmin: District Manage" ON users FOR ALL TO authenticated USING (public.m_role() = 'WoredaAdmin' AND woreda_id = public.m_woreda_id() AND role IN ('Officer', 'Clerk')) WITH CHECK (public.m_role() = 'WoredaAdmin' AND woreda_id = public.m_woreda_id() AND role IN ('Officer', 'Clerk'));
+CREATE POLICY "Users: Self Update" ON users FOR UPDATE TO authenticated USING (id = auth.uid()) WITH CHECK (id = auth.uid());
+CREATE POLICY "Auth: Signup Insert" ON users FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
+-- ==========================================
+-- 7. VIEWS & REPORTING
+-- ==========================================
+
+-- Audit Log Function
+CREATE OR REPLACE FUNCTION insert_audit_log(
+    p_user TEXT,
+    p_role TEXT,
+    p_action TEXT,
+    p_details TEXT,
+    p_ip_address TEXT,
+    p_status TEXT
+) RETURNS VOID AS $$
+DECLARE
+    v_woreda_id UUID;
+BEGIN
+    -- 1. Try to fetch the user context
+    SELECT woreda_id INTO v_woreda_id FROM public.users WHERE id = auth.uid();
+    
+    -- 2. Audit logs should never be unassigned if possible
+    INSERT INTO audit_logs (woreda_id, "user", role, action, details, ip_address, status)
+    VALUES (v_woreda_id, p_user, p_role, p_action, p_details, p_ip_address, p_status);
+END;
+$$ LANGUAGE plpgsql;
+
+-- District Dashboard View
+CREATE OR REPLACE VIEW woreda_dashboard 
+WITH (security_invoker = on) AS
+SELECT 
+    w.id as woreda_id,
+    w.name as woreda_name,
+    w.code as woreda_code,
+    COUNT(DISTINCT v.id) as total_violations,
+    COALESCE(SUM(v.amount), 0) as total_fines,
+    COALESCE(SUM(v.amount_paid), 0) as total_collected,
+    COUNT(DISTINCT u.id) FILTER (WHERE u.role = 'Officer') as assigned_officers,
+    COUNT(DISTINCT a.id) FILTER (WHERE a.is_active = true) as active_alerts
+FROM woredas w
+LEFT JOIN users u ON u.woreda_id = w.id
+LEFT JOIN violations v ON v.woreda_id = w.id AND v.deleted_at IS NULL
+LEFT JOIN alerts a ON a.woreda_id = w.id AND a.deleted_at IS NULL
+GROUP BY w.id, w.name, w.code;
+
+-- Officer Vehicle Summary View
+CREATE OR REPLACE VIEW officer_vehicle_summary 
+WITH (security_invoker = on) AS 
+SELECT 
+    v.plate_number, 
+    v.make, 
+    v.model, 
+    v.color, 
+    v.status as vehicle_status, 
+    v.owner_name, 
+    v.owner_phone, 
+    COUNT(DISTINCT vio.id) FILTER (WHERE vio.status = 'Unpaid') as unpaid_violations, 
+    COALESCE(SUM(vio.amount) FILTER (WHERE vio.status = 'Unpaid'), 0::numeric) as total_unpaid, 
+    MAX(vio.created_at) as last_violation_date 
+FROM vehicles v 
+LEFT JOIN violations vio ON v.plate_number = vio.plate_number AND vio.deleted_at IS NULL 
+WHERE v.deleted_at IS NULL 
+GROUP BY v.id, v.plate_number, v.make, v.model, v.color, v.status, v.owner_name, v.owner_phone;
+
+-- ==========================================
+-- 6. ROW LEVEL SECURITY (RLS) ENABLEMENT
+-- ==========================================
+ALTER TABLE woredas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;
@@ -209,201 +504,97 @@ ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 
--- Enable Realtime for activities
--- Create the publication if it doesn't exist
+-- ==========================================
+-- 7. SEED DATA
+-- ==========================================
+INSERT INTO woredas (name, code) VALUES
+('Woreda 1', 'DILLA-W01'), ('Woreda 2', 'DILLA-W02'), ('Woreda 3', 'DILLA-W03'),
+('Woreda 4', 'DILLA-W04'), ('Woreda 5', 'DILLA-W05'), ('Woreda 6', 'DILLA-W06'),
+('Woreda 7', 'DILLA-W07'), ('Woreda 8', 'DILLA-W08'), ('Woreda 9', 'DILLA-W09'),
+('Woreda 10', 'DILLA-W10'), ('Woreda 11', 'DILLA-W11'), ('Woreda 12', 'DILLA-W12');
+
+-- ==========================================
+-- 8. INDEXES & PERFORMANCE OPTIMIZATIONS
+-- ==========================================
+
+-- Foreign key indexes
+CREATE INDEX IF NOT EXISTS idx_payments_violation_id ON payments(violation_id);
+CREATE INDEX IF NOT EXISTS idx_violations_woreda ON violations(woreda_id);
+CREATE INDEX IF NOT EXISTS idx_payments_woreda ON payments(woreda_id);
+CREATE INDEX IF NOT EXISTS idx_users_woreda ON users(woreda_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_woreda ON alerts(woreda_id);
+CREATE INDEX IF NOT EXISTS idx_applications_woreda ON applications(woreda_id);
+CREATE INDEX IF NOT EXISTS idx_activities_woreda ON activities(woreda_id);
+
+-- Composite indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_violations_woreda_created ON violations(woreda_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_woreda_date ON payments(woreda_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_users_woreda_role ON users(woreda_id, role);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_woreda_timestamp ON audit_logs(woreda_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_woreda_created ON alerts(woreda_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_priority ON alerts(priority) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_alerts_category ON alerts(category);
+
+-- Vehicle search indexes
+CREATE INDEX IF NOT EXISTS idx_vehicles_plate_number ON vehicles(plate_number);
+CREATE INDEX IF NOT EXISTS idx_vehicles_plate_trgm ON vehicles USING gin (plate_number gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_vehicles_owner_name ON vehicles(owner_name);
+CREATE INDEX IF NOT EXISTS idx_vehicles_status ON vehicles(status);
+CREATE INDEX IF NOT EXISTS idx_vehicles_deleted ON vehicles(deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_vehicles_updated ON vehicles(updated_at DESC);
+
+-- Driver search indexes
+CREATE INDEX IF NOT EXISTS idx_drivers_license_number ON drivers(license_number);
+CREATE INDEX IF NOT EXISTS idx_drivers_license_trgm ON drivers USING gin (license_number gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_drivers_name_trgm ON drivers USING gin (full_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_drivers_phone ON drivers(phone);
+CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status);
+
+-- Violation indexes
+CREATE INDEX IF NOT EXISTS idx_violations_plate_number ON violations(plate_number);
+CREATE INDEX IF NOT EXISTS idx_violations_plate_trgm ON violations USING gin (plate_number gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_violations_license_number ON violations(license_number);
+CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status);
+CREATE INDEX IF NOT EXISTS idx_violations_created ON violations(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_violations_composite ON violations(plate_number, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_violations_updated ON violations(updated_at DESC);
+
+-- Activity feed indexes
+CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(type);
+
+-- User lookup indexes
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+-- Payment indexes
+CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at DESC);
+
+-- ==========================================
+-- 9. REALTIME & POWERSYNC SETUP
+-- ==========================================
+
+-- Realtime publications
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
         CREATE PUBLICATION supabase_realtime;
     END IF;
 END $$;
+
+-- Add tables to realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE activities;
 ALTER PUBLICATION supabase_realtime ADD TABLE violations;
 ALTER PUBLICATION supabase_realtime ADD TABLE alerts;
+ALTER PUBLICATION supabase_realtime ADD TABLE woredas;
+ALTER PUBLICATION supabase_realtime ADD TABLE audit_logs;
 
--- 5.1 Users Table Policies
--- Allow anonymous users to look up their email by username for the login flow
-CREATE POLICY "Allow anonymous username lookup" ON users 
-FOR SELECT TO anon 
-USING (status = 'Active');
-
--- Consolidated policies for efficiency (Avoid multiple permissive policies)
-CREATE POLICY "Enable SELECT for authenticated users" ON users 
-FOR SELECT TO authenticated 
-USING (true);
-
-CREATE POLICY "Enable INSERT for authenticated users" ON users 
-FOR INSERT TO authenticated 
-WITH CHECK (true);
-
--- Allow authenticated users to update their own records or Admins to update any
-CREATE POLICY "Users can update own record or Admins update any" ON users 
-FOR UPDATE TO authenticated 
-USING (
-    (SELECT auth.uid()) = id 
-    OR 
-    (SELECT get_user_role()) = 'Admin'
-)
-WITH CHECK (
-    (SELECT auth.uid()) = id 
-    OR 
-    (SELECT get_user_role()) = 'Admin'
-);
-
--- Admins have full access (DELETE and others)
-CREATE POLICY "Admins have DELETE access" ON users 
-FOR DELETE TO authenticated 
-USING ((SELECT get_user_role()) = 'Admin');
-
--- 5.2 Operational Data Policies (Clerks, Officers & Admins get full access)
--- Drop the catch-all debug policy 
-DROP POLICY IF EXISTS "TEMP DEBUG - Allow All Vehicle Actions" ON vehicles; 
-
--- Create explicit policies for all operations 
-CREATE POLICY "Enable all for authenticated users" 
-ON vehicles FOR ALL 
-TO authenticated 
-USING (true) 
-WITH CHECK (true); 
-
--- Secure anonymous access (Read only for public/anonymous)
-CREATE POLICY "Enable read for anon" 
-ON vehicles FOR SELECT 
-TO anon 
-USING (status = 'Active');
-
-
--- Operational policies for Clerks, Officers and Admins
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON drivers FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON violations FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON plates FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON payments FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON audit_logs FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON applications FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON alerts FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
-CREATE POLICY "Operational access for Clerks, Officers and Admins" ON activities FOR ALL TO authenticated
-USING ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'))
-WITH CHECK ((SELECT get_user_role()) IN ('Admin', 'Clerk', 'Officer'));
-
--- ==========================================
--- 6. RECALCULATE STATISTICS (The Fix for Culprit A)
--- ==========================================
-ANALYZE users;
-ANALYZE vehicles;
-ANALYZE violations;
-ANALYZE drivers;
-ANALYZE plates;
-ANALYZE payments;
-ANALYZE alerts;
-ANALYZE activities;
-
--- ==========================================
--- 7. INDEXES & PERFORMANCE OPTIMIZATIONS
--- ==========================================
-
--- Cover foreign keys to avoid full table scans on joins
-CREATE INDEX IF NOT EXISTS idx_payments_violation_id ON payments(violation_id);
-
--- Vehicles table indexes
-CREATE INDEX IF NOT EXISTS idx_vehicles_plate_number ON vehicles(plate_number); -- Standard B-tree for direct = match (FASTEST)
-CREATE INDEX IF NOT EXISTS idx_vehicles_plate_number_trgm ON vehicles USING gin (plate_number gin_trgm_ops); -- GIN for search (.ilike)
-CREATE INDEX IF NOT EXISTS idx_vehicles_owner_name ON vehicles(owner_name); 
-CREATE INDEX IF NOT EXISTS idx_vehicles_status ON vehicles(status); 
-CREATE INDEX IF NOT EXISTS idx_vehicles_deleted ON vehicles(deleted_at) WHERE deleted_at IS NULL; 
-
--- Violations table indexes (most frequently queried) 
-CREATE INDEX IF NOT EXISTS idx_violations_plate_number ON violations(plate_number); -- Standard B-tree for Joins
-CREATE INDEX IF NOT EXISTS idx_violations_plate_number_trgm ON violations USING gin (plate_number gin_trgm_ops); -- GIN for Search
-CREATE INDEX IF NOT EXISTS idx_violations_license_number ON violations(license_number); -- Added missing FK-like index
-CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status); 
-CREATE INDEX IF NOT EXISTS idx_violations_created ON violations(created_at DESC); 
-CREATE INDEX IF NOT EXISTS idx_violations_composite ON violations(plate_number, status, created_at); 
-
--- Drivers table indexes
-CREATE INDEX IF NOT EXISTS idx_drivers_license_number ON drivers(license_number); -- Standard B-tree for direct = match
-CREATE INDEX IF NOT EXISTS idx_drivers_license_number_trgm ON drivers USING gin (license_number gin_trgm_ops); -- GIN for Search
-CREATE INDEX IF NOT EXISTS idx_drivers_phone ON drivers(phone); 
-CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status); 
-
--- Activities table (for recent scans) 
-CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC); 
-CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(type); 
-
--- Users table (Optimized for Auth lookups)
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
-
--- Timestamps for PowerSync sync windows
-CREATE INDEX IF NOT EXISTS idx_vehicles_updated ON vehicles(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_violations_updated ON violations(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at DESC);
-
--- Optimize table for PowerSync sync frequency 
--- Add last_sync tracking (helps with debugging sync issues) 
-ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ; 
-ALTER TABLE drivers ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ; 
-ALTER TABLE violations ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ; 
-
--- View for common officer queries
--- Optimized with security_invoker = on for Supabase security compliance
-CREATE OR REPLACE VIEW officer_vehicle_summary 
-WITH (security_invoker = on) AS 
-SELECT 
-    v.plate_number, 
-    v.make, 
-    v.model, 
-    v.color, 
-    v.status as vehicle_status, 
-    v.owner_name, 
-    v.owner_phone, 
-    COUNT(DISTINCT vio.id) FILTER (WHERE vio.status = 'Unpaid'::text OR vio.status = 'PENDING'::text) as unpaid_violations, 
-    COALESCE(SUM(vio.amount) FILTER (WHERE vio.status = 'Unpaid'::text OR vio.status = 'PENDING'::text), 0::numeric) as total_unpaid, 
-    MAX(vio.created_at) as last_violation_date 
-FROM vehicles v 
-LEFT JOIN violations vio ON v.plate_number = vio.plate_number AND vio.deleted_at IS NULL 
-WHERE v.deleted_at IS NULL 
-GROUP BY v.id, v.plate_number, v.make, v.model, v.color, v.status, v.owner_name, v.owner_phone;
-
--- ==========================================
--- 7. POWERSYNC INTEGRATION
--- ==========================================
-
--- 1. Refresh the Publication
--- This tells PowerSync which tables to stream to your offline clients.
--- Important: PowerSync requires all tables mentioned in your Sync Rules to be in this publication.
+-- PowerSync publication
 DROP PUBLICATION IF EXISTS powersync;
 CREATE PUBLICATION powersync FOR TABLE 
-    users,
-    vehicles, 
-    drivers, 
-    violations, 
-    plates, 
-    alerts, 
-    payments;
+    users, vehicles, drivers, violations, plates, alerts, payments, woredas;
 
--- 2. Enable REPLICA IDENTITY FULL
--- Crucial for PowerSync to correctly identify and sync row updates/deletes.
+-- Set replica identity for PowerSync
 ALTER TABLE users REPLICA IDENTITY FULL;
 ALTER TABLE vehicles REPLICA IDENTITY FULL;
 ALTER TABLE drivers REPLICA IDENTITY FULL;
@@ -411,13 +602,22 @@ ALTER TABLE violations REPLICA IDENTITY FULL;
 ALTER TABLE plates REPLICA IDENTITY FULL;
 ALTER TABLE alerts REPLICA IDENTITY FULL;
 ALTER TABLE payments REPLICA IDENTITY FULL;
+ALTER TABLE woredas REPLICA IDENTITY FULL;
+ALTER TABLE audit_logs REPLICA IDENTITY FULL;
+ALTER TABLE applications REPLICA IDENTITY FULL;
+ALTER TABLE activities REPLICA IDENTITY FULL;
 
 -- ==========================================
--- 8. INITIAL DATA (Optional)
+-- 10. ANALYZE FOR QUERY PLANNER
 -- ==========================================
--- Example: Create an initial admin user record in the public.users table.
--- NOTE: You must ALSO create this user in Supabase Auth (auth.users) with the same email.
-/*
-INSERT INTO users (username, email, role, name, status, can_access_web)
-VALUES ('admin', 'admin@example.com', 'Admin', 'System Administrator', 'Active', TRUE);
-*/
+ANALYZE woredas;
+ANALYZE users;
+ANALYZE vehicles;
+ANALYZE drivers;
+ANALYZE violations;
+ANALYZE plates;
+ANALYZE payments;
+ANALYZE alerts;
+ANALYZE applications;
+ANALYZE activities;
+ANALYZE audit_logs;

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { FaShieldAlt, FaSearch, FaDownload } from 'react-icons/fa';
 import { getAuditLogs } from '../../database';
-import { AuditLog } from '../../types';
+import { AuditLog, User, UserRole } from '../../types';
 import { useTranslation } from 'react-i18next';
 
 interface AuditLogScreenProps {
   onBack: () => void;
+  currentUser: User | null;
 }
 
-const AuditLogScreen: React.FC<AuditLogScreenProps> = ({ onBack }) => {
+const AuditLogScreen: React.FC<AuditLogScreenProps> = ({ onBack, currentUser }) => {
     const { t } = useTranslation();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState('All');

@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { FaFileCsv, FaFilePdf } from 'react-icons/fa';
 import { getPayments, getVehicles, getDrivers } from '../../database';
+import { User, UserRole } from '../../types';
 import { useTranslation } from 'react-i18next';
 
 interface ReportGeneratorScreenProps {
   onBack: () => void;
+  currentUser: User | null;
 }
 
 type ReportType = 'none' | 'revenue' | 'registrations' | 'licenses';
 
-const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack }) => {
+const ReportGeneratorScreen: React.FC<ReportGeneratorScreenProps> = ({ onBack, currentUser }) => {
     const { t } = useTranslation();
     const { addToast } = useToast();
     const [reportType, setReportType] = useState<ReportType>('none');

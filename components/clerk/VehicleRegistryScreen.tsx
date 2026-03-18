@@ -30,7 +30,7 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
 
   const handleToggleStolen = async (vehicle: Vehicle) => {
     const currentUser = 'Clerk'; // In a real app, get from auth context
-    const wasStolen = vehicle.stolen_status?.isStolen;
+    const wasStolen = vehicle.stolenStatus?.isStolen;
 
     try {
       if (wasStolen) {
@@ -49,9 +49,9 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
             return {
               ...v,
               status: isNowStolen ? 'Stolen' : 'Active',
-              stolen_status: isNowStolen
+              stolenStatus: isNowStolen
                 ? { isStolen: true, reportedBy: currentUser, reportedAt: new Date().toISOString() }
-                : { ...v.stolen_status!, isStolen: false }
+                : { ...v.stolenStatus!, isStolen: false }
             };
           }
           return v;
@@ -278,10 +278,10 @@ const VehicleRegistryScreen: React.FC<VehicleRegistryScreenProps> = ({ onBack })
                 : t('markStolenConfirm', { plate: selectedVehicle.plateNumber })}
             </p>
             
-            {selectedVehicle.status === 'Stolen' && selectedVehicle.stolen_status && (
+            {selectedVehicle.status === 'Stolen' && selectedVehicle.stolenStatus && (
               <div className="bg-gray-50 p-3 rounded-lg mb-6 text-xs text-gray-600">
-                <p><strong>{t('reportedAt')}:</strong> {new Date(selectedVehicle.stolen_status.reportedAt || '').toLocaleString()}</p>
-                <p><strong>{t('reportedBy')}:</strong> {selectedVehicle.stolen_status.reportedBy}</p>
+                <p><strong>{t('reportedAt')}:</strong> {new Date(selectedVehicle.stolenStatus.reportedAt || '').toLocaleString()}</p>
+                <p><strong>{t('reportedBy')}:</strong> {selectedVehicle.stolenStatus.reportedBy}</p>
               </div>
             )}
 
