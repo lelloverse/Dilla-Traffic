@@ -1,6 +1,7 @@
 // database.ts
 import { supabase } from './supabaseClient';
-import { Vehicle, Driver, Violation, User, SearchResult, Alert, PlateItem, Payment, AuditLog, Woreda } from './types';
+import { Vehicle, Driver, Violation, SearchResult, Alert, PlateItem, Payment, AuditLog, Woreda } from './types';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -471,18 +472,91 @@ export const updateAlert = async (id: string, updates: Partial<Alert>): Promise<
 };
 
 // --- Password Reset API ---
-export const resetPasswordForUser = async (userId: string, newPassword: string): Promise<void> => {
-    try {
-        const { data, error } = await supabase.functions.invoke('reset-password', {
-            body: { userId, newPassword }
-        });
-        
-        if (error) throw error;
-        if (!data) throw new Error('No response from Edge Function');
-        
-        console.log(`Password reset successful for user ${userId}`);
-    } catch (error: any) {
-        console.error('Password reset failed:', error);
-        throw new Error(`Failed to reset password: ${error.message}`);
+import { User } from './types';
+
+export interface ApiResponse {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
+export const validateSession = async (): Promise<boolean> => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    return !error && !!session?.access_token;
+  } catch {
+    return false;
+  }
+};
+
+export const resetPasswordForUser = async (userId: string, newPassword: string): Promise<ApiResponse> => {
+  // Pre-flight token check
+  if (!await validateSession()) {
+    return {
+      success: false,
+      message: 'Session expired. Please log in again.',
+      error: 'NO_SESSION'
+    };
+  }
+
+  if (newPassword.length < 8) {
+    return {
+      success: false,
+      message: 'Password must be at least 8 characters.',
+      error: 'PASSWORD_TOO_SHORT'
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('reset-password', {
+      body: { userId, newPassword }
+    });
+
+    if (error) {
+      // Specific 401/JWT handling
+      if (error.message?.includes('Invalid JWT') || error.status === 401) {
+        return {
+          success: false,
+          message: 'Session expired. Please refresh and try again.',
+          error: 'INVALID_JWT'
+        };
+      }
+      
+      // User not found or other server errors
+      if (error.message?.includes('userId') || error.status === 404) {
+        return {
+          success: false,
+          message: 'User not found.',
+          error: 'USER_NOT_FOUND'
+        };
+      }
+
+      return {
+        success: false,
+        message: `Reset failed: ${error.message}`,
+        error: 'SERVER_ERROR'
+      };
     }
+
+    if (!data) {
+      return {
+        success: false,
+        message: 'No response from server.',
+        error: 'NO_RESPONSE'
+      };
+    }
+
+    return {
+      success: true,
+      message: `Password reset successful for ${userId}`,
+      error: undefined
+    };
+  } catch (error: any) {
+    console.error('Password reset failed:', error);
+    return {
+      success: false,
+      message: 'Network error. Please try again.',
+      error: 'NETWORK_ERROR'
+    };
+  }
 };

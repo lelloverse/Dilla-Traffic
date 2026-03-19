@@ -1,15 +1,12 @@
-# Fix Deno TypeScript Errors in Supabase Edge Function
+# Deno TS Errors Fix Progress Tracker
 
-## Steps
-- [x] 1. Delete supabase/functions/reset-password/index.deno.ts
-- [x] 2. Update .vscode/settings.json with deno.enablePaths
-- [x] 3. Reload VSCode window
-- [ ] 4. Fix supabase/config.toml + Test: supabase functions serve reset-password (no TS errors)
-- [ ] 5. Deploy: supabase functions deploy reset-password
+Current status: Fixing TypeScript errors in supabase/functions/reset-password/index.ts
 
-**Verification:**
-```
-# Step 4 test command (in project root)
-npx supabase functions serve reset-password --env-file .env
-```
-
+## Plan Steps:
+- [x] Step 1: Update .vscode/settings.json to enable Deno LSP support
+- [x] Step 2: Update supabase/functions/reset-password/deno.json std version to latest (0.233.0)
+- [x] Step 3: Reload VSCode (Ctrl+Shift+P > Developer: Reload Window)
+- [ ] Step 4: Verify no TS errors in index.ts
+- [ ] Step 5: Test function: cd supabase/functions/reset-password &amp;&amp; supabase functions serve reset-password --env-file ../../../.env
+- [ ] Step 6: Deploy: supabase functions deploy reset-password
+- [ ] Step 7: Update TODO-Fix-Deno-TS-Errors.md to complete and remove this TODO

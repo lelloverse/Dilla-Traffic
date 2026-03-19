@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { UserRole, Application, SearchResult, ProfileData, User, Vehicle, ClerkView, AdminView } from './types';
-import { getSearchResults, getUsers, addUser, getVehicles } from './database';
+import { getSearchResults, getUsers, addUser, getVehicles, validateSession, ApiResponse } from './database';
 import { supabase } from './supabaseClient';
 import { ToastProvider } from './context/ToastContext';
 import ToastContainer from './components/shared/ToastContainer';
@@ -52,6 +52,72 @@ const App: React.FC = () => {
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   
+  // Auth state monitoring - sync with Supabase
+  useEffect(() => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, !!session);
+      
+      if (event === 'SIGNED_OUT' || !session) {
+        setIsLoggedIn(false);
+        setUserRole(UserRole.None);
+        setCurrentUser(null);
+        setError('');
+        resetAllViews();
+        return;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (!session.user) return;
+
+        // Validate session token
+        const isValid = await validateSession();
+        if (!isValid) {
+          await supabase.auth.signOut();
+          setError('Session invalid. Logged out.');
+          return;
+        }
+
+        // Fetch extended user profile from public.users
+        try {
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('id, name, username, email, role, woreda_id, status, can_access_web, can_access_mobile')
+            .eq('id', session.user.id)
+            .single();
+
+          if (error || !userData || userData.status !== 'Active' || !userData.can_access_web) {
+            console.warn('User profile invalid, signing out:', error);
+            await supabase.auth.signOut();
+            return;
+          }
+
+          setIsLoggedIn(true);
+          setUserRole(userData.role as UserRole);
+          setCurrentUser({
+            id: userData.id,
+            name: userData.name,
+            username: userData.username,
+            email: userData.email,
+            role: userData.role as UserRole,
+            woredaId: userData.woreda_id,
+            status: userData.status as 'Active' | 'Inactive',
+            canAccessWeb: userData.can_access_web,
+            canAccessMobile: userData.can_access_mobile,
+            lastLogin: new Date().toISOString()
+          });
+        } catch (err) {
+          console.error('Failed to load user profile:', err);
+          await supabase.auth.signOut();
+        }
+      }
+    });
+
+    // Cleanup subscription
+    return () => {
+      supabase.auth.onAuthStateChange(() => {}); // Simplified cleanup
+    };
+  }, []);
+
   // Initialize data on first load and set search data
   useEffect(() => {
     const init = async () => {
