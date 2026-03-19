@@ -1,5 +1,5 @@
 // database.ts
-import { supabase, supabaseAdmin } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import { Vehicle, Driver, Violation, User, SearchResult, Alert, PlateItem, Payment, AuditLog, Woreda } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -473,20 +473,13 @@ export const updateAlert = async (id: string, updates: Partial<Alert>): Promise<
 // --- Password Reset API ---
 export const resetPasswordForUser = async (userId: string, newPassword: string): Promise<void> => {
     try {
-        // Update Supabase Auth password (service role)
-        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-            userId,
-            { password: newPassword }
-        );
-        if (authError) throw authError;
-
-        // Update custom users table password for consistency
-        const { error: dbError } = await supabase
-            .from('users')
-            .update({ password: newPassword })
-            .eq('id', userId);
-        if (dbError) throw dbError;
-
+        const { data, error } = await supabase.functions.invoke('reset-password', {
+            body: { userId, newPassword }
+        });
+        
+        if (error) throw error;
+        if (!data) throw new Error('No response from Edge Function');
+        
         console.log(`Password reset successful for user ${userId}`);
     } catch (error: any) {
         console.error('Password reset failed:', error);
