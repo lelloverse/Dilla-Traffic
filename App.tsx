@@ -1,7 +1,10 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
+
+const ABORT_DELAY = 10000; // 10 seconds timeout
+
 import { UserRole, Application, SearchResult, ProfileData, User, Vehicle, ClerkView, AdminView } from './types';
-import { getSearchResults, getUsers, addUser, getVehicles, validateSession, ApiResponse } from './database';
+import { getSearchResults, getUsers, addUser, getVehicles, getUserProfile, validateSession, ApiResponse } from './database';
 import { supabase } from './supabaseClient';
 import { ToastProvider } from './context/ToastContext';
 import ToastContainer from './components/shared/ToastContainer';
@@ -142,35 +145,35 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ABORT_DELAY);
+
+    console.log('🔐 Login attempt:', { username });
+
     try {
-        // Find the user in our profile table first to get their email and status
-        // Check username first
-        let { data: users, error: userError } = await supabase
-            .from('users')
-            .select('id, name, username, email, role, woreda_id, status, can_access_web, can_access_mobile')
-            .eq('username', username);
-
-        if (userError) {
-            console.error('User fetch error:', userError);
-        }
-
-        // If not found by username, try searching by email
-        if (!users || users.length === 0) {
-            const { data: usersByEmail, error: emailError } = await supabase
-                .from('users')
-                .select('id, name, username, email, role, woreda_id, status, can_access_web, can_access_mobile')
-                .eq('email', username);
-            
-            if (emailError) {
-                console.error('Email fetch error:', emailError);
-            }
-            
-            if (usersByEmail && usersByEmail.length > 0) {
-                users = usersByEmail;
-            }
-        }
+        // 🚀 NEW: Single optimized query using database.getUserProfile()
+        console.log('🔍 [LOGIN] Single query for username/email:', username);
+        const queryStart = performance.now();
         
-        const userData = users && users.length > 0 ? users[0] : null;
+        let userData;
+        try {
+          userData = await Promise.race([
+            getUserProfile(username),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Profile query timeout (10s)')), ABORT_DELAY)
+            )
+          ]);
+          const queryTime = performance.now() - queryStart;
+          console.log(`✅ [LOGIN] Profile query OK (${queryTime.toFixed(0)}ms):`, {
+            found: !!userData,
+            username: userData?.username,
+            email: userData?.email,
+            status: userData?.status
+          });
+        } catch (profileError: any) {
+          console.error('❌ [LOGIN] Profile query FAILED:', profileError);
+          throw new Error(`Profile lookup failed: ${profileError.message}`);
+        }
 
         if (!userData) {
             throw new Error('Invalid username or password.');
@@ -188,10 +191,16 @@ const App: React.FC = () => {
             throw new Error('This account does not have permission to access the web platform.');
         }
 
-        const { data, error: authError } = await supabase.auth.signInWithPassword({
+        console.log('🔑 Attempting Supabase auth for:', userData.email);
+        const { data, error: authError } = await Promise.race([
+          supabase.auth.signInWithPassword({
             email: userData.email,
             password: password,
-        });
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Auth timeout - check Supabase connection')), ABORT_DELAY)
+          )
+        ]);
 
         if (authError) {
             throw new Error(authError.message === 'Invalid login credentials' ? 'Invalid username or password.' : authError.message);
@@ -214,9 +223,13 @@ const App: React.FC = () => {
             });
         }
     } catch (err: any) {
-        setError(err.message || 'Invalid username or password.');
+        const errorMsg = err.name === 'AbortError' ? `Login timeout: ${err.message}` : (err.message || 'Login failed');
+        console.error('❌ Login error:', err);
+        setError(errorMsg);
     } finally {
+        clearTimeout(timeoutId);
         setIsLoading(false);
+        console.log('⏹️ Login process ended');
     }
   }, []);
 

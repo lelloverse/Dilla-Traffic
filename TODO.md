@@ -1,1 +1,12 @@
-# TODO: Fix Supabase reset-password Function Deploy\n\n## Steps:\n\n- [x] Step 1: Create/update TODO.md with plan (current)\n- [x] Step 2: Edit supabase/functions/reset-password/index.ts - Switch to Deno.serve()\n- [x] Step 3: Edit supabase/functions/reset-password/deno.json - Clean up imports (removed std/http since not needed)\n- [ ] Step 4: Test locally with `npx supabase functions serve reset-password --env-file ../../.env`\n- [ ] Step 5: Deploy with `npx supabase functions deploy reset-password`\n- [ ] Step 6: Mark complete and cleanup TODO.md\n\nStatus: Edits complete. Ready for testing.
+# Login Fix Progress
+
+## Plan Steps:
+- [x] Step 1: Add timeout, logging, & better error handling to App.tsx handleLogin()
+- [x] Step 2: Enhance error display in LoginComponent.tsx
+- [x] Step 3: Add debug logging to supabaseClient.ts
+- [x] Step 4: Create DEBUG.md with troubleshooting instructions
+- [ ] Step 5: Test login with valid/invalid credentials, check console/network
+- [ ] Step 6: Attempt completion
+
+Current progress: Ready for testing (Step 5)
+

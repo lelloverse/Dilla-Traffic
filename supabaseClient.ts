@@ -15,3 +15,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+console.log('🪨 Supabase client initialized:', {
+  url: supabaseUrl ? supabaseUrl.slice(0, 30) + '...' : 'MISSING',
+  anonKey: supabaseAnonKey ? 'SET' : 'MISSING'
+});
+
