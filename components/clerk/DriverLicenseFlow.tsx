@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { updateApplication, updateDriver, addAuditLog } from '../../database';
-import { Application, ApplicationType, ApplicationStatus, Driver } from '../../types';
+import { Application, ApplicationType, ApplicationStatus, Driver, User } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import { useTranslation } from 'react-i18next';
 
 interface DriverLicenseFlowProps {
   onBack: () => void;
+  currentUser: User | null;
 }
 
-const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
+const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack, currentUser }) => {
   const { t } = useTranslation();
   const { addToast } = useToast();
 
@@ -123,58 +124,62 @@ const DriverLicenseFlow: React.FC<DriverLicenseFlowProps> = ({ onBack }) => {
     }
   };
 
-  const handleSubmitClick = () => {
+  const handleSubmitClick = async () => {
       setShowConfirmation(true);
   };
 
-  const confirmSubmit = () => {
+const confirmSubmit = async () => {
       setShowConfirmation(false);
-      const newApp: Application = {
-          id: formData.appId,
-          applicantName: `${formData.firstName} ${formData.lastName}`,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          gender: formData.gender,
-          phone: formData.phone,
-          type: ApplicationType.NewLicense,
-          submittedDate: new Date().toISOString().split('T')[0],
-          status: ApplicationStatus.Pending,
-          details: {
-              dob: formData.dob,
-              address: formData.address,
-              documents: [],
-              testResults: [],
-              notes: []
-          }
-      };
-      updateApplication(newApp);
+      try {
+        const newApp: Application = {
+            id: formData.appId,
+            applicantName: `${formData.firstName} ${formData.lastName}`,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            gender: formData.gender,
+            phone: formData.phone,
+            type: ApplicationType.NewLicense,
+            submittedDate: new Date().toISOString().split('T')[0],
+            status: ApplicationStatus.Pending,
+            details: {
+                dob: formData.dob,
+                address: formData.address,
+                documents: [],
+                testResults: [],
+                notes: []
+            }
+        };
+        await updateApplication(newApp);
 
-      // For stock number update requested by user, we also add the driver to the registry
-      const newDriver: Driver = {
-          id: 'DRV-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-          licenseNumber: 'L-' + Math.floor(100000 + Math.random() * 900000),
-          fullName: `${formData.firstName} ${formData.lastName}`,
-          phone: formData.phone,
-          email: `${formData.firstName.toLowerCase()}@example.com`,
-          gender: formData.gender,
-          status: 'Active',
-          expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().split('T')[0], // 5 years
-          associatedVehicles: []
-      };
-      updateDriver(newDriver);
+        // For stock number update requested by user, we also add the driver to the registry
+        const newDriver: Driver = {
+            id: 'DRV-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+            licenseNumber: 'L-' + Math.floor(100000 + Math.random() * 900000),
+            fullName: `${formData.firstName} ${formData.lastName}`,
+            phone: formData.phone,
+            email: `${formData.firstName.toLowerCase()}@example.com`,
+            gender: formData.gender,
+            status: 'Active',
+            expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().split('T')[0], // 5 years
+            associatedVehicles: []
+        };
+        await updateDriver(newDriver);
 
-      addAuditLog({
-          user: 'clerk',
-          role: 'Clerk',
-          action: 'Driver Licensed',
-          details: `Processed new license application and registry for ${newDriver.fullName}`,
-          ipAddress: '127.0.0.1',
-          status: 'success'
-      });
+        await addAuditLog(
+            'Driver Licensed', 
+            `Processed new license application and registry for ${newDriver.fullName}`, 
+            currentUser?.username || 'clerk', 
+            currentUser?.role || 'Clerk', 
+            currentUser?.woredaId || null
+        );
 
-      addToast(t('applicationSuccess'), "success");
-      onBack();
-  }
+        addToast(t('applicationSuccess'), "success");
+        onBack();
+      } catch (error: any) {
+        console.error('Driver License Registration Error:', error);
+        addToast(`Registration failed: ${error.message || 'Database error. Check console for details.'}`, 'error');
+      }
+  };
 
   const getInputClass = (fieldName: string) => {
       return `w-full p-2 border rounded ${

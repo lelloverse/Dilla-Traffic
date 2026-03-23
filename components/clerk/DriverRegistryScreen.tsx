@@ -7,9 +7,14 @@ import { useToast } from '../../context/ToastContext';
 
 interface DriverRegistryScreenProps {
   onBack: () => void;
+  currentUser?: {
+    username: string;
+    role: string;
+    woredaId: string | null;
+  } | null;
 }
 
-const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) => {
+const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack, currentUser }) => {
   const { t } = useTranslation();
   const { addToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,14 +53,13 @@ const DriverRegistryScreen: React.FC<DriverRegistryScreenProps> = ({ onBack }) =
     };
 
     await updateDriver(updatedDriver);
-    await addAuditLog({
-        user: 'clerk',
-        role: 'Clerk',
-        action: 'Vehicle Associated',
-        details: `Associated vehicle ${plateNumber} to driver ${selectedDriver.fullName}`,
-        ipAddress: '127.0.0.1',
-        status: 'success'
-    });
+    await addAuditLog(
+      'VEHICLE_ASSOCIATED',
+      `Associated vehicle ${plateNumber} to driver ${selectedDriver.fullName}`,
+      currentUser?.username || 'Unknown Clerk',
+      currentUser?.role || 'Clerk',
+      currentUser?.woredaId || null
+    );
 
     addToast(`Vehicle ${plateNumber} associated successfully`, "success");
     setSelectedDriver(updatedDriver); // Update local state for modal

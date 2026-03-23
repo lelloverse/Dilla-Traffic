@@ -1,7 +1,7 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 
-const ABORT_DELAY = 10000; // 10 seconds timeout
+const ABORT_DELAY = 30000; // Increased to 30 seconds for slower networks
 
 import { UserRole, Application, SearchResult, ProfileData, User, Vehicle, ClerkView, AdminView } from './types';
 import { getSearchResults, getUsers, addUser, getVehicles, getUserProfile, validateSession, ApiResponse } from './database';
@@ -34,6 +34,32 @@ import VehicleProfileScreen from './components/shared/VehicleProfileScreen';
 import DriverProfileScreen from './components/shared/DriverProfileScreen';
 
 
+const robustCleanup = async () => {
+  try {
+    // ⏳ Add a 2s timeout to signOut to prevent hanging if network is unstable
+    await Promise.race([
+      supabase.auth.signOut(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Sign out timeout')), 2000))
+    ]).catch(err => console.warn('Sign out timed out or failed, proceeding with local cleanup:', err));
+  } catch (err) {
+    console.warn('Sign out error:', err);
+  }
+  
+  // Clear Supabase tokens from BOTH storage types
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  if (url) {
+    const ref = url.match(/https:\/\/([^\.]+)\.supabase\.co/)?.[1];
+    if (ref) {
+      const key = `sb-${ref}-auth-token`;
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    }
+  }
+  
+  // Clear all session storage
+  sessionStorage.clear();
+};
+
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<UserRole>(UserRole.None);
@@ -53,11 +79,36 @@ const App: React.FC = () => {
   // State for Admin view
   const [adminView, setAdminView] = useState<AdminView>('dashboard');
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   
-  // Auth state monitoring - sync with Supabase
+  const authSubscription = useRef<(() => void) | null>(null);
+  
+  // Auth state monitoring - sync with Supabase (FIXED CLEANUP)
   useEffect(() => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    // 🛡️ INITIAL CLEANUP: Purge any stale localStorage tokens if using sessionStorage
+    const purgeStaleStorage = () => {
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      if (url) {
+        const ref = url.match(/https:\/\/([^\.]+)\.supabase\.co/)?.[1];
+        if (ref) {
+          const key = `sb-${ref}-auth-token`;
+          // Only remove from localStorage if we are committed to sessionStorage
+          if (localStorage.getItem(key)) {
+            console.log('🧹 Purging stale localStorage Supabase token');
+            localStorage.removeItem(key);
+          }
+        }
+      }
+    };
+    purgeStaleStorage();
+
+    // Cleanup previous subscription
+    if (authSubscription.current) {
+      authSubscription.current();
+      authSubscription.current = null;
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, !!session);
       
       if (event === 'SIGNED_OUT' || !session) {
@@ -75,7 +126,7 @@ const App: React.FC = () => {
         // Validate session token
         const isValid = await validateSession();
         if (!isValid) {
-          await supabase.auth.signOut();
+          await robustCleanup();
           setError('Session invalid. Logged out.');
           return;
         }
@@ -88,9 +139,9 @@ const App: React.FC = () => {
             .eq('id', session.user.id)
             .single();
 
-          if (error || !userData || userData.status !== 'Active' || !userData.can_access_web) {
-            console.warn('User profile invalid, signing out:', error);
-            await supabase.auth.signOut();
+          if (error || !userData || userData.status !== 'Active' || userData.can_access_web === false) {
+            console.warn('User profile invalid, signing out:', error || 'Invalid status or permissions');
+            await robustCleanup();
             return;
           }
 
@@ -110,14 +161,21 @@ const App: React.FC = () => {
           });
         } catch (err) {
           console.error('Failed to load user profile:', err);
-          await supabase.auth.signOut();
+          await robustCleanup();
         }
       }
     });
 
-    // Cleanup subscription
+    authSubscription.current = () => {
+      if (subscription) subscription.unsubscribe();
+    };
+
+    // Cleanup on unmount
     return () => {
-      supabase.auth.onAuthStateChange(() => {}); // Simplified cleanup
+      if (authSubscription.current) {
+        authSubscription.current();
+        authSubscription.current = null;
+      }
     };
   }, []);
 
@@ -151,7 +209,11 @@ const App: React.FC = () => {
     console.log('🔐 Login attempt:', { username });
 
     try {
-        // 🚀 NEW: Single optimized query using database.getUserProfile()
+        // 🛡️ FIRST: SILENT storage purge (no state updates to prevent UI conflicts)
+        console.log('🔑 Silent purge of existing session tokens');
+        await robustCleanup();
+
+        // 🚀 NEXT: Single optimized query using database.getUserProfile()
         console.log('🔍 [LOGIN] Single query for username/email:', username);
         const queryStart = performance.now();
         
@@ -160,7 +222,7 @@ const App: React.FC = () => {
           userData = await Promise.race([
             getUserProfile(username),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Profile query timeout (10s)')), ABORT_DELAY)
+              setTimeout(() => reject(new Error(`Profile query timeout (${ABORT_DELAY/1000}s)`)), ABORT_DELAY)
             )
           ]);
           const queryTime = performance.now() - queryStart;
@@ -187,17 +249,17 @@ const App: React.FC = () => {
             throw new Error('Your account has been deactivated. Please contact an administrator.');
         }
 
-        if (userData.can_access_web === false) {
+        if (userData.canAccessWeb === false) {
             throw new Error('This account does not have permission to access the web platform.');
         }
-
+        
         console.log('🔑 Attempting Supabase auth for:', userData.email);
         const { data, error: authError } = await Promise.race([
           supabase.auth.signInWithPassword({
             email: userData.email,
             password: password,
           }),
-          new Promise((_, reject) =>
+          new Promise<any>((_, reject) =>
             setTimeout(() => reject(new Error('Auth timeout - check Supabase connection')), ABORT_DELAY)
           )
         ]);
@@ -215,10 +277,10 @@ const App: React.FC = () => {
                 username: userData.username,
                 email: userData.email,
                 role: userData.role as UserRole,
-                woredaId: userData.woreda_id,
+                woredaId: userData.woredaId,
                 status: userData.status as 'Active' | 'Inactive',
-                canAccessWeb: userData.can_access_web,
-                canAccessMobile: userData.can_access_mobile,
+                canAccessWeb: userData.canAccessWeb,
+                canAccessMobile: userData.canAccessMobile,
                 lastLogin: new Date().toISOString()
             });
         }
@@ -233,12 +295,18 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleLogout = async (): Promise<void> => {
-    await supabase.auth.signOut();
+  const clearAuthData = useCallback(async () => {
+    await robustCleanup();
+    
     setIsLoggedIn(false);
     setUserRole(UserRole.None);
+    setCurrentUser(null);
     setError('');
     resetAllViews();
+  }, []);
+
+  const handleLogout = async (): Promise<void> => {
+    await clearAuthData();
   };
   
   // Search Handlers
@@ -263,10 +331,10 @@ const App: React.FC = () => {
     switch (clerkView) {
       case 'new-vehicle':
         if (isOfficer) return <ClerkDashboard onNavigate={setClerkView} userRole={userRole} />;
-        return <VehicleRegistrationFlow onBack={() => setClerkView('dashboard')} />;
+        return <VehicleRegistrationFlow onBack={() => setClerkView('dashboard')} currentUser={currentUser} />;
       case 'new-license':
         if (isOfficer) return <ClerkDashboard onNavigate={setClerkView} userRole={userRole} />;
-        return <DriverLicenseFlow onBack={() => setClerkView('dashboard')} />;
+        return <DriverLicenseFlow onBack={() => setClerkView('dashboard')} currentUser={currentUser} />;
       case 'payments':
         if (isOfficer) return <ClerkDashboard onNavigate={setClerkView} userRole={userRole} />;
         return <PaymentProcessingScreen onBack={() => setClerkView('dashboard')} />;
@@ -276,7 +344,7 @@ const App: React.FC = () => {
       case 'vehicles':
         return <VehicleRegistryScreen onBack={() => setClerkView('dashboard')} />;
       case 'drivers':
-        return <DriverRegistryScreen onBack={() => setClerkView('dashboard')} />;
+        return <DriverRegistryScreen onBack={() => setClerkView('dashboard')} currentUser={currentUser} />;
       case 'violations':
         return <ViolationManagementScreen onBack={() => setClerkView('dashboard')} />;
       case 'alerts':

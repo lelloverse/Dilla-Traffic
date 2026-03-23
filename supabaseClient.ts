@@ -12,6 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
+    storage: sessionStorage,  // Use sessionStorage: clears on tab close, prevents stale tokens across sessions
   },
 });
 

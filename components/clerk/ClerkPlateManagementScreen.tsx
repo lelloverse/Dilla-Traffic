@@ -22,11 +22,19 @@ const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         const fetchPlates = async () => {
-            const data = await getPlates();
-            setPlates(data.slice().reverse());
+            try {
+                setIsLoading(true);
+                const data = await getPlates();
+                setPlates(data.slice().reverse());
+            } catch (err) {
+                console.error('Failed to fetch plates:', err);
+            } finally {
+                setIsLoading(false);
+            }
         };
         fetchPlates();
     }, []);
@@ -65,18 +73,26 @@ const ClerkPlateManagementScreen: React.FC<ClerkPlateManagementScreenProps> = ({
             return;
         }
 
-        await addPlate(formData);
-        const updatedPlates = await getPlates();
-        setPlates(updatedPlates.slice().reverse());
-        setFormData({
-            plateNumber: '',
-            type: 'private',
-            dateReceived: new Date().toISOString().split('T')[0],
-            status: 'available',
-            notes: ''
-        });
-        setTouched({});
-        addToast("Plate added to inventory successfully", "success");
+        try {
+            setIsLoading(true);
+            await addPlate(formData);
+            const updatedPlates = await getPlates();
+            setPlates(updatedPlates.slice().reverse());
+            setFormData({
+                plateNumber: '',
+                type: 'private',
+                dateReceived: new Date().toISOString().split('T')[0],
+                status: 'available',
+                notes: ''
+            });
+            setTouched({});
+            addToast("Plate added to inventory successfully", "success");
+        } catch (err: any) {
+            console.error('❌ Failed to add plate:', err);
+            addToast(err.message || "Failed to add plate to inventory", "error");
+        } finally {
+            setIsLoading(false);
+        }
     }
     
     const getInputClass = (fieldName: string) => {

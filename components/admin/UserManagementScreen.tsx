@@ -56,14 +56,13 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
             await updateUser(updatedUser);
             setUsers(users.map(u => u.id === user.id ? updatedUser : u));
             
-            await addAuditLog({
-                action: `USER_STATUS_CHANGE`,
-                user: 'Admin', // In a real app, get from auth context
-                role: 'Admin',
-                details: `Changed status for user ${user.username} to ${newStatus}`,
-                status: 'success',
-                ipAddress: 'internal'
-            });
+            await addAuditLog(
+                `USER_STATUS_CHANGE`,
+                `Changed status for user ${user.username} to ${newStatus}`,
+                currentUser?.username || 'Admin',
+                currentUser?.role || 'Admin',
+                currentUser?.woredaId || null
+            );
 
             addToast(t('userStatusChanged', { name: user.name, status: newStatus === 'Active' ? t('activated') : t('deactivated') }), "success");
         } catch (error) {
@@ -84,11 +83,12 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
             name: '',
             username: '',
             email: '',
-            role: UserRole.Clerk,
+            role: currentUser?.role === UserRole.WoredaAdmin ? UserRole.Officer : UserRole.Admin,
             status: 'Active',
             password: '',
             canAccessWeb: true,
             canAccessMobile: false,
+            woredaId: currentUser?.role === UserRole.WoredaAdmin ? currentUser?.woredaId : undefined,
         });
         setShowEditModal(true);
     };
@@ -112,67 +112,41 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
                     return;
                 }
 
-                const targetWoredaId = currentUser?.role === UserRole.WoredaAdmin ? currentUser.woredaId : newUser.woredaId;
+                const result = await addUser({
+                    ...newUser,
+                    canAccessWeb: newUser.canAccessWeb ?? true,
+                    canAccessMobile: newUser.canAccessMobile ?? false,
+                    woredaId: newUser.woredaId || null
+                } as Partial<User>);
 
-                // 1. Create in Supabase Auth
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email: newUser.email,
-                    password: newUser.password,
-                    options: {
-                        data: {
-                            full_name: newUser.name,
-                            username: newUser.username,
-                            role: newUser.role,
-                            woreda_id: targetWoredaId
-                        }
-                    }
-                });
-
-                if (authError) throw authError;
-
-                if (authData.user) {
-                    const createdUser: User = {
-                        id: authData.user.id,
-                        name: newUser.name!,
-                        username: newUser.username!,
-                        email: newUser.email!,
-                        role: newUser.role || UserRole.Clerk,
-                        woredaId: targetWoredaId,
-                        lastLogin: 'Never',
-                        status: 'Active',
-                        password: newUser.password,
-                        canAccessWeb: newUser.canAccessWeb ?? true,
-                        canAccessMobile: newUser.canAccessMobile ?? false
-                    };
-
-                    // 2. Add to our users table
-                    await addUser(createdUser);
-                    
-                    await addAuditLog({
-                        action: 'USER_CREATED',
-                        user: currentUser?.username || 'Admin',
-                        role: currentUser?.role || 'Admin',
-                        details: `Created new user: ${newUser.username} (${newUser.role}) in Woreda: ${createdUser.woredaId || 'Global'}`,
-                        status: 'success',
-                        ipAddress: 'internal'
-                    });
-
-                    setUsers([...users, createdUser]);
-                    addToast(t('userCreatedSuccess', { name: createdUser.name }), "success");
+                if (!result.success || !result.data) {
+                    throw new Error(result.message || 'Failed to create user');
                 }
+
+                const createdUser = result.data;
+                    
+                await addAuditLog(
+                    'USER_CREATED',
+                    `Created new user: ${newUser.username} (${newUser.role}) in Woreda: ${createdUser.woredaId || 'Global'}`,
+                    currentUser?.username || 'Admin',
+                    currentUser?.role || 'Admin',
+                    currentUser?.woredaId || null
+                );
+
+                setUsers([...users, createdUser]);
+                addToast(t('userCreatedSuccess', { name: createdUser.name }), "success");
             } else if (selectedUser) {
                 const oldUser = users.find(u => u.id === selectedUser.id);
                 await updateUser(selectedUser);
                 
                 if (oldUser && oldUser.role !== selectedUser.role) {
-                    await addAuditLog({
-                        action: 'ROLE_ASSIGNMENT',
-                        user: 'Admin',
-                        role: 'Admin',
-                        details: `Changed role for ${selectedUser.username} from ${oldUser.role} to ${selectedUser.role}`,
-                        status: 'success',
-                        ipAddress: 'internal'
-                    });
+                await addAuditLog(
+                    'ROLE_ASSIGNMENT',
+                    `Changed role for ${selectedUser.username} from ${oldUser.role} to ${selectedUser.role}`,
+                    currentUser?.username || 'Admin',
+                    currentUser?.role || 'Admin',
+                    currentUser?.woredaId || null
+                );
                 }
 
                 setUsers(users.map(u => u.id === selectedUser.id ? selectedUser : u));
@@ -200,14 +174,13 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
             // Use new reset function (updates both auth.users & public.users)
             await resetPasswordForUser(selectedUser.id, resetPasswordValue);
             
-            await addAuditLog({
-                action: 'PASSWORD_RESET',
-                user: currentUser?.username || 'Admin',
-                role: currentUser?.role || 'Admin',
-                details: `Reset password for user ${selectedUser.username}`,
-                status: 'success',
-                ipAddress: 'internal'
-            });
+            await addAuditLog(
+                'PASSWORD_RESET',
+                `Reset password for user ${selectedUser.username}`,
+                currentUser?.username || 'Admin',
+                currentUser?.role || 'Admin',
+                currentUser?.woredaId || null
+            );
 
             addToast(t('passwordResetSuccess'), "success");
             setResetPasswordValue('');
@@ -254,7 +227,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
                         <th scope="col" className="px-6 py-3">{t('name')}</th>
                         <th scope="col" className="px-6 py-3">{t('usernameEmail')}</th>
                         <th scope="col" className="px-6 py-3">{t('role')}</th>
-                        {currentUser?.role === UserRole.Admin && <th scope="col" className="px-6 py-3">Woreda</th>}
+                        {(currentUser?.role === UserRole.Admin || currentUser?.role === UserRole.WoredaAdmin) && <th scope="col" className="px-6 py-3">Woreda</th>}
                         <th scope="col" className="px-6 py-3">{t('status')}</th>
                         <th scope="col" className="px-6 py-3 text-right">{t('actions')}</th>
                     </tr>
@@ -295,7 +268,7 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
                                     </div>
                                 </div>
                             </td>
-                            {currentUser?.role === UserRole.Admin && (
+                            {(currentUser?.role === UserRole.Admin || currentUser?.role === UserRole.WoredaAdmin) && (
                                 <td className="px-6 py-4">
                                     <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded border border-gray-200">
                                         {woredas.find(w => w.id === user.woredaId)?.name || 'Global'}
@@ -399,8 +372,8 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
                             </div>
                         </div>
 
-                        {/* Woreda Selection - Hidden for WoredaAdmin */}
-                        {currentUser?.role === UserRole.Admin && (
+                        {/* Woreda Selection */}
+                        {(currentUser?.role === UserRole.Admin || currentUser?.role === UserRole.WoredaAdmin) && (
                             <div>
                                 <label htmlFor="woreda" className="block text-xs font-medium mb-1 text-gray-700">Woreda / District</label>
                                 <select 
@@ -411,10 +384,14 @@ const UserManagementScreen: React.FC<UserManagementScreenProps> = ({ onBack, cur
                                         isCreating ? setNewUser({...newUser, woredaId: val}) : setSelectedUser({...selectedUser!, woredaId: val});
                                     }} 
                                     className="w-full p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    disabled={currentUser?.role === UserRole.WoredaAdmin}
                                 >
                                     <option value="">Global / No Woreda</option>
                                     {woredas.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                 </select>
+                                {currentUser?.role === UserRole.WoredaAdmin && (
+                                    <p className="text-[10px] text-gray-400 mt-1">Users are automatically assigned to your woreda.</p>
+                                )}
                             </div>
                         )}
 

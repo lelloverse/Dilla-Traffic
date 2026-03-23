@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { updateVehicle, addAuditLog } from '../../database';
-import { Vehicle } from '../../types';
+import { Vehicle, User } from '../../types';
 import { useTranslation } from 'react-i18next';
 
 interface VehicleRegistrationFlowProps {
   onBack: () => void;
+  currentUser: User | null;
 }
 
-const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBack }) => {
+const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBack, currentUser }) => {
   const { t } = useTranslation();
   const { addToast } = useToast();
 
@@ -133,46 +134,49 @@ const VehicleRegistrationFlow: React.FC<VehicleRegistrationFlowProps> = ({ onBac
     }
   };
 
-  const handleSubmitClick = () => {
+  const handleSubmitClick = async () => {
       setShowConfirmation(true);
   };
 
-  const confirmSubmit = () => {
+  const confirmSubmit = async () => {
       setShowConfirmation(false);
-      
-      const newVehicle: any = {
-          id: 'VEH-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-          plateNumber: formData.plateNumber,
-          make: formData.make,
-          model: formData.model,
-          year: parseInt(formData.year),
-          ownerName: formData.ownerName,
-          ownerPhone: formData.phone,
-          type: formData.type,
-          status: 'Active',
-          expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0], // 2 years expiry
-          // Map additional fields for database.ts
-          address: formData.address,
-          nationalId: formData.nationalId,
-          chassisNumber: formData.chassisNumber,
-          engineNumber: formData.engineNumber,
-          color: formData.color,
-          fuelType: formData.fuelType
-      };
+      try {
+        const newVehicle: any = {
+            id: 'VEH-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+            plateNumber: formData.plateNumber,
+            make: formData.make,
+            model: formData.model,
+            year: parseInt(formData.year),
+            ownerName: formData.ownerName,
+            ownerPhone: formData.phone,
+            type: formData.type,
+            status: 'Active',
+            expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0], // 2 years expiry
+            // Map additional fields for database.ts
+            address: formData.address,
+            nationalId: formData.nationalId,
+            chassisNumber: formData.chassisNumber,
+            engineNumber: formData.engineNumber,
+            color: formData.color,
+            fuelType: formData.fuelType
+        };
 
-      updateVehicle(newVehicle);
-      
-      addAuditLog({
-          user: 'clerk',
-          role: 'Clerk',
-          action: 'Vehicle Registered',
-          details: `Registered vehicle ${newVehicle.make} ${newVehicle.model} with plate ${newVehicle.plateNumber}`,
-          ipAddress: '127.0.0.1',
-          status: 'success'
-      });
+        await updateVehicle(newVehicle);
+        
+        await addAuditLog(
+            'Vehicle Registered', 
+            `Registered vehicle ${newVehicle.make} ${newVehicle.model} with plate ${newVehicle.plateNumber}`, 
+            currentUser?.username || 'clerk', 
+            currentUser?.role || 'Clerk', 
+            currentUser?.woredaId || null
+        );
 
-      addToast(t('registrationSuccess'), "success");
-      onBack();
+        addToast(t('registrationSuccess'), "success");
+        onBack();
+      } catch (error: any) {
+        console.error('Vehicle Registration Error:', error);
+        addToast(`Registration failed: ${error.message || 'Database error. Check console for details.'}`, 'error');
+      }
   };
 
   const getInputClass = (fieldName: string) => {

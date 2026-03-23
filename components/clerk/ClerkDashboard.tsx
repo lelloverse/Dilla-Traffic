@@ -85,20 +85,34 @@ const ClerkDashboard: React.FC<ClerkDashboardProps> = ({ onNavigate, userRole })
   useEffect(() => {
     const fetchData = async () => {
         try {
-            const [v, d, pl, py, vio] = await Promise.all([
+            // ⏳ Add a 15s timeout to the entire dashboard fetch to prevent permanent hangs
+            const fetchPromise = Promise.all([
                 getVehicles(),
                 getDrivers(),
                 getPlates(),
                 getPayments(),
                 getViolations()
             ]);
-            setVehicles(v);
-            setDrivers(d);
-            setPlates(pl);
-            setPayments(py);
-            setViolations(vio);
+
+            const timeoutPromise = new Promise<any>((_, reject) => 
+                setTimeout(() => reject(new Error('Dashboard timeout')), 15000)
+            );
+
+            const [v, d, pl, py, vio] = await Promise.race([fetchPromise, timeoutPromise]);
+            
+            setVehicles(v || []);
+            setDrivers(d || []);
+            setPlates(pl || []);
+            setPayments(py || []);
+            setViolations(vio || []);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
+            // On error, set empty arrays so the UI still renders
+            setVehicles([]);
+            setDrivers([]);
+            setPlates([]);
+            setPayments([]);
+            setViolations([]);
         } finally {
             setIsLoading(false);
         }

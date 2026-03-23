@@ -90,14 +90,7 @@ const ViolationManagementScreen: React.FC<ViolationManagementScreenProps> = ({ o
 
     await updateViolation(updated);
 
-    await addAuditLog({
-        user: 'clerk',
-        role: 'Clerk',
-        action: 'Payment Undone',
-        details: `Reverted payments for violation ${v.id}. Status set back to Unpaid.`,
-        ipAddress: '127.0.0.1',
-        status: 'success'
-    });
+    await addAuditLog('Payment Undone', `Reverted payments for violation ${v.id}. Status set back to Unpaid.`, 'clerk', 'Clerk', null);
     
     const updatedViolations = await getViolations();
     setViolations(updatedViolations);

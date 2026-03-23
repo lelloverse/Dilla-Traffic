@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import { Vehicle, Driver, Violation, SearchResult, Alert, PlateItem, Payment, AuditLog, Woreda } from './types';
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-
+import { createClient } from '@supabase/supabase-js';
 
 // --- Mapping Helpers ---
 
@@ -46,12 +46,13 @@ export const getVehicles = async (plateNumber?: string): Promise<Vehicle[]> => {
     let query = supabase
         .from('vehicles')
         .select('*')
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false });
     
     if (plateNumber) {
         query = query.eq('plate_number', plateNumber);
     } else {
-        query = query.limit(100); // Default limit for general list
+        query = query.limit(100); // Prevent fetching massive amounts for the dashboard
     }
 
     const { data, error } = await query;
@@ -60,6 +61,7 @@ export const getVehicles = async (plateNumber?: string): Promise<Vehicle[]> => {
 };
 
 export const updateVehicle = async (vehicle: Vehicle): Promise<void> => {
+    console.log('🔄 updateVehicle called:', { id: vehicle.id, plateNumber: vehicle.plateNumber });
     const v = vehicle as any;
     const { error } = await supabase
         .from('vehicles')
@@ -84,7 +86,11 @@ export const updateVehicle = async (vehicle: Vehicle): Promise<void> => {
             fuel_type: v.fuelType,
             updated_at: new Date().toISOString()
         });
-    if (error) throw error;
+    if (error) {
+        console.error('❌ updateVehicle failed:', error);
+        throw error;
+    }
+    console.log('✅ updateVehicle success:', vehicle.plateNumber);
 };
 
 export const markVehicleAsStolen = async (vehicleId: string, reportedBy: string): Promise<void> => {
@@ -127,12 +133,13 @@ export const getDrivers = async (licenseNumber?: string): Promise<Driver[]> => {
     let query = supabase
         .from('drivers')
         .select('*')
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false });
     
     if (licenseNumber) {
         query = query.eq('license_number', licenseNumber);
     } else {
-        query = query.limit(100); // Default limit for general list
+        query = query.limit(100); // Prevent fetching massive amounts for the dashboard
     }
 
     const { data, error } = await query;
@@ -141,6 +148,7 @@ export const getDrivers = async (licenseNumber?: string): Promise<Driver[]> => {
 };
 
 export const updateDriver = async (driver: Driver): Promise<void> => {
+    console.log('🔄 updateDriver called:', { id: driver.id, licenseNumber: driver.licenseNumber });
     const d = driver as any;
     const { error } = await supabase
         .from('drivers')
@@ -156,7 +164,11 @@ export const updateDriver = async (driver: Driver): Promise<void> => {
             associated_vehicles: d.associatedVehicles,
             updated_at: new Date().toISOString()
         });
-    if (error) throw error;
+    if (error) {
+        console.error('❌ updateDriver failed:', error);
+        throw error;
+    }
+    console.log('✅ updateDriver success:', driver.licenseNumber);
 };
 
 // --- Violations API ---
@@ -164,7 +176,9 @@ export const getViolations = async (): Promise<Violation[]> => {
     const { data, error } = await supabase
         .from('violations')
         .select('*')
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(200); // Prevent fetching massive amounts for the dashboard
     if (error) throw error;
     return (data || []).map(mapToCamel) as Violation[];
 };
@@ -214,28 +228,98 @@ export const getUsers = async (): Promise<User[]> => {
     return (data || []).map(mapToCamel) as User[];
 };
 
-export const addUser = async (user: User): Promise<void> => {
-    const u = user as any;
-    
-    // IMPORTANT: Don't generate a new UUID here!
-    // The user.id should already be the auth.users ID
-    const { error } = await supabase
-        .from('users')
-        .upsert({ 
-            id: u.id, // Remove the || uuidv4() - this must be the auth.users ID
-            name: u.name,
-            username: u.username,
-            email: u.email,
-            password: u.password,
-            role: u.role,
-            woreda_id: u.woredaId,
-            status: u.status || 'Active',
-            can_access_web: u.canAccessWeb ?? true,
-            can_access_mobile: u.canAccessMobile ?? false
-        });
-    if (error) throw error;
-};
+export const addUser = async (user: Partial<User>): Promise<{ success: boolean; data?: any; message?: string }> => {
+  try {
+    const tempClient = createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      }
+    );
 
+    const { data: authData, error: authError } = await tempClient.auth.signUp({
+      email: user.email!,
+      password: user.password!,
+      options: {
+        data: {
+          role: user.role,
+          username: user.username,
+          woreda_id: user.woredaId,
+          name: user.name,
+          can_access_web: user.canAccessWeb ?? true,
+          can_access_mobile: user.canAccessMobile ?? false
+        }
+      }
+    });
+
+    if (authError) throw authError;
+    if (!authData?.user?.id) {
+      throw new Error('Failed to create auth user');
+    }
+
+    const userId = authData.user.id;
+    
+    // Wait for trigger to create public.users row (retry logic)
+    const maxRetries = 5;
+    const retryDelay = 500; // ms
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = not found
+          throw profileError;
+        }
+
+        if (profileData) {
+          // Update additional fields to ensure synchronization
+          await supabase
+            .from('users')
+            .update({
+              username: user.username,
+              password: user.password, // Explicitly recording password in public.users as requested
+              role: user.role,
+              woreda_id: user.woredaId,
+              status: 'Active',
+              can_access_web: user.canAccessWeb ?? true,
+              can_access_mobile: user.canAccessMobile ?? false
+            })
+            .eq('id', userId);
+          
+          // Re-fetch the updated profile
+          const { data: finalProfile } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+          return { success: true, data: mapToCamel(finalProfile || profileData) };
+        }
+
+        // Wait before retry
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      } catch (retryError) {
+        if (attempt === maxRetries) throw retryError;
+      }
+    }
+
+    throw new Error('Timeout waiting for user profile creation');
+  } catch (error: any) {
+    console.error("Error in addUser:", error);
+    return { success: false, message: error.message || 'User creation failed' };
+  }
+};
 export const updateUser = async (user: User): Promise<void> => {
     const u = user as any;
     const updateData: any = {
@@ -265,12 +349,11 @@ export const getUserProfile = async (identifier: string) => {
     const { data, error } = await supabase
         .from('users')
         .select('*')
-        // Allow login by either username OR email
-        .or(`username.eq.${identifier},email.eq.${identifier}`)
-        .maybeSingle();
+        .or(`username.eq.${identifier},email.eq.${identifier}`);
     
     if (error) throw error;
-    return mapToCamel(data) as User;
+    if (!data || data.length === 0) return null;
+    return mapToCamel(data[0]) as User;
 };
 
 
@@ -278,7 +361,9 @@ export const getUserProfile = async (identifier: string) => {
 export const getPlates = async (): Promise<PlateItem[]> => {
     const { data, error } = await supabase
         .from('plates')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200); // Prevent fetching massive amounts for the dashboard
     if (error) throw error;
     return (data || []).map(mapToCamel) as PlateItem[];
 };
@@ -317,7 +402,9 @@ export const getCurrentUserWoreda = async (): Promise<string> => {
 export const getPayments = async (): Promise<Payment[]> => {
     const { data, error } = await supabase
         .from('payments')
-        .select('*');
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(200); // Prevent fetching massive amounts for the dashboard
     if (error) throw error;
     return (data || []).map(mapToCamel) as Payment[];
 };
@@ -356,25 +443,39 @@ export const getAuditLogs = async (): Promise<AuditLog[]> => {
     }
 };
 
-export const addAuditLog = async (log: any): Promise<void> => {
-    const { error } = await supabase.rpc('insert_audit_log', {
-        p_user: log.user,
-        p_role: log.role,
-        p_action: log.action,
-        p_details: log.details,
-        p_ip_address: log.ipAddress,
-        p_status: log.status
-    });
-    if (error) throw error;
+export const addAuditLog = async (
+  action: string, 
+  details: string, 
+  username: string, 
+  role: string, 
+  woredaId: string | null
+) => {
+  // Ensure we use the exact parameter names defined in the SQL function
+  const { error } = await supabase.rpc('insert_audit_log', {
+    p_action: action,
+    p_details: details,
+    p_username: username,
+    p_role: role,
+    p_woreda_id: woredaId || null // Crucial: Convert empty strings to null
+  });
+
+  if (error) {
+    console.error("❌ Audit Log Error:", error);
+  }
 };
 
 // --- Applications API ---
 export const updateApplication = async (app: any): Promise<void> => {
+    console.log('🔄 updateApplication called:', { id: app.id, status: app.status });
     const { error } = await supabase
         .from('applications')
         .update({ status: app.status })
         .eq('id', app.id);
-    if (error) throw error;
+    if (error) {
+        console.error('❌ updateApplication failed:', error);
+        throw error;
+    }
+    console.log('✅ updateApplication success:', app.id);
 };
 
 // --- Woreda Dashboard API ---
@@ -390,8 +491,8 @@ export const getWoredaDashboard = async (woredaId: string): Promise<any> => {
 
 // --- Search API ---
 export const getSearchResults = async (query?: string): Promise<SearchResult[]> => {
-    let vQuery = supabase.from('vehicles').select('id, plate_number').is('deleted_at', null);
-    let dQuery = supabase.from('drivers').select('id, full_name').is('deleted_at', null);
+    let vQuery = supabase.from('vehicles').select('id, plate_number').is('deleted_at', null).order('updated_at', { ascending: false });
+    let dQuery = supabase.from('drivers').select('id, full_name').is('deleted_at', null).order('updated_at', { ascending: false });
 
     if (query && query.trim()) {
         const searchTerm = `%${query.trim()}%`;
@@ -400,8 +501,8 @@ export const getSearchResults = async (query?: string): Promise<SearchResult[]> 
     }
 
     const [{ data: vData, error: vErr }, { data: dData, error: dErr }] = await Promise.all([
-        vQuery.limit(50),
-        dQuery.limit(50)
+        vQuery.limit(20), // Limit search results for performance
+        dQuery.limit(20)
     ]);
 
     if (vErr) throw vErr;
@@ -483,8 +584,14 @@ export interface ApiResponse {
 export const validateSession = async (): Promise<boolean> => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    return !error && !!session?.access_token;
+    if (!error && session?.access_token) {
+      return true;
+    }
+    // Clear invalid session
+    await supabase.auth.signOut();
+    return false;
   } catch {
+    await supabase.auth.signOut();
     return false;
   }
 };
